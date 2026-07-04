@@ -1,5 +1,8 @@
 ﻿param(
-    [string]$Version = '1.1.2.0',
+    [string]$Version,
+    [string]$PublicLabel,
+    [string]$ReleaseTag,
+    [string]$Repository,
     [string]$CertificateThumbprint,
     [string]$PfxPath,
     [securestring]$PfxPassword,
@@ -11,10 +14,50 @@ $ErrorActionPreference = 'Stop'
 $packagingDir = Split-Path -Parent $PSCommandPath
 $packageRoot = Split-Path -Parent $packagingDir
 $workspaceRoot = Split-Path -Parent (Split-Path -Parent $packageRoot)
+$versionFile = Join-Path $packageRoot 'version.json'
+
+if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
+    $versionInfo = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
+    if (-not $Version -and $versionInfo.version) {
+        $Version = [string]$versionInfo.version
+    }
+
+    if (-not $PublicLabel -and $versionInfo.publicLabel) {
+        $PublicLabel = [string]$versionInfo.publicLabel
+    }
+
+    if (-not $Repository -and $versionInfo.githubRepository) {
+        $Repository = [string]$versionInfo.githubRepository
+    }
+}
+
+if (-not $Version) {
+    $Version = '2.0.4.0'
+}
+
+if (-not $PublicLabel) {
+    $PublicLabel = 'V2.0.0-RC5'
+}
+
+if (-not $Repository) {
+    $Repository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
+}
+
+if (-not $ReleaseTag) {
+    $ReleaseTag = ('v' + ($PublicLabel -replace '^V', '')).ToLowerInvariant()
+}
+
 $distDir = Join-Path $packageRoot 'dist'
 $payloadZip = Join-Path $distDir 'portable-payload.zip'
 $msiPath = Join-Path $distDir ("PcNinja-WinUpdateTool-Setup-{0}-x64.msi" -f $Version)
 $portableExePath = Join-Path $distDir ("PcNinja-WinUpdateTool-Portable-{0}.exe" -f $Version)
+$publicReleaseDir = Join-Path $packageRoot 'public-release'
+$publicMsiFileName = "PcNinja-WinUpdateTool-$PublicLabel-Setup-x64.msi"
+$publicPortableFileName = "PcNinja-WinUpdateTool-$PublicLabel-Portable.exe"
+$publicZipFileName = "PcNinja-WinUpdateTool-$PublicLabel-PublicRelease.zip"
+$publicMsiPath = Join-Path $publicReleaseDir $publicMsiFileName
+$publicPortablePath = Join-Path $publicReleaseDir $publicPortableFileName
+$publicZipPath = Join-Path $packageRoot $publicZipFileName
 $examplesDir = Join-Path $distDir 'deployment-examples'
 $hostExePath = Join-Path $packageRoot 'PcNinja.WinUpdateTool.exe'
 $cliExePath = Join-Path $packageRoot 'PcNinja.WinUpdateTool.Cli.exe'
@@ -35,6 +78,18 @@ else {
 
 if (Test-Path -LiteralPath $examplesDir) {
     Remove-Item -LiteralPath $examplesDir -Recurse -Force
+}
+
+if (Test-Path -LiteralPath $publicReleaseDir) {
+    Remove-Item -LiteralPath $publicReleaseDir -Recurse -Force
+}
+
+if (Test-Path -LiteralPath $publicZipPath) {
+    Remove-Item -LiteralPath $publicZipPath -Force
+}
+
+if (Test-Path -LiteralPath ($publicZipPath + '.sha256.txt')) {
+    Remove-Item -LiteralPath ($publicZipPath + '.sha256.txt') -Force
 }
 
 function Write-ExampleFile {
@@ -252,6 +307,7 @@ Sign-ReleaseFiles -Certificate $signingCertificate -Timestamp $TimestampServer -
     $hostExePath,
     $cliExePath,
     (Join-Path $packageRoot 'WinUpdateTool.ps1'),
+    (Join-Path $packageRoot 'WinUpdateTool.V2Ui.ps1'),
     (Join-Path $packageRoot 'WinUpdateCore.psm1'),
     (Join-Path $packageRoot 'Install-WinUpdateTool.ps1'),
     (Join-Path $packageRoot 'Uninstall-WinUpdateTool.ps1'),
@@ -265,6 +321,7 @@ try {
         -arch x64 `
         -ext WixToolset.UI.wixext `
         -d "SourceDir=$packageRoot" `
+        -d "ProductVersion=$Version" `
         -o $msiPath `
         $wxsPath
 }
@@ -287,7 +344,9 @@ try {
         'PcNinja.WinUpdateTool.exe',
         'PcNinja.WinUpdateTool.Cli.exe',
         'WinUpdateTool.ps1',
+        'WinUpdateTool.V2Ui.ps1',
         'WinUpdateCore.psm1',
+        'version.json',
         'Launch-WinUpdateTool.vbs',
         'Run-Portable.cmd',
         'README.md'
@@ -316,7 +375,7 @@ finally {
     /platform:x64 `
     /out:$portableExePath `
     /win32icon:$iconPath `
-    /resource:$payloadZip,PcNinjaPortablePayload `
+    "/resource:$payloadZip,PcNinjaPortablePayload" `
     /reference:System.IO.Compression.dll `
     /reference:System.IO.Compression.FileSystem.dll `
     /reference:System.Windows.Forms.dll `
@@ -334,7 +393,7 @@ Remove-Item -LiteralPath $payloadZip -Force
 Write-ExampleFile -Name 'Install-MSI-Silent-Basic.cmd' -Lines @(
     '@echo off',
     'setlocal',
-    ('set "MSI=%~dp0..\PcNinja-WinUpdateTool-Setup-{0}-x64.msi"' -f $Version),
+    ('set "MSI=%~dp0..\{0}"' -f $publicMsiFileName),
     'msiexec /i "%MSI%" /qn /norestart',
     'exit /b %ERRORLEVEL%'
 )
@@ -342,7 +401,7 @@ Write-ExampleFile -Name 'Install-MSI-Silent-Basic.cmd' -Lines @(
 Write-ExampleFile -Name 'Install-MSI-Silent-WithProperties.cmd' -Lines @(
     '@echo off',
     'setlocal',
-    ('set "MSI=%~dp0..\PcNinja-WinUpdateTool-Setup-{0}-x64.msi"' -f $Version),
+    ('set "MSI=%~dp0..\{0}"' -f $publicMsiFileName),
     'msiexec /i "%MSI%" /qn /norestart ^',
     '  PCNINJA_ENABLE_SCHEDULE=1 ^',
     '  PCNINJA_FREQUENCY=Monthly ^',
@@ -365,7 +424,7 @@ Write-ExampleFile -Name 'Install-MSI-Silent-WithProperties.cmd' -Lines @(
 Write-ExampleFile -Name 'BigFix-Action-Example.cmd' -Lines @(
     '@echo off',
     'rem BigFix usually works best with one command line.',
-    ('msiexec /i "__Download\PcNinja-WinUpdateTool-Setup-{0}-x64.msi" /qn /norestart PCNINJA_ENABLE_SCHEDULE=1 PCNINJA_FREQUENCY=Monthly PCNINJA_MONTHLY_DAY=15 PCNINJA_TIME=03:00 PCNINJA_RUN_AT_STARTUP=1 PCNINJA_STARTUP_DELAY=5 PCNINJA_RUN_IF_MISSED=1 PCNINJA_WAKE_TO_RUN=1 PCNINJA_ALLOW_FIRMWARE=0 PCNINJA_REBOOT_PROMPT=1 PCNINJA_ENABLE_AUTORETRY=1 PCNINJA_RETRY_INITIAL_DELAY=5 PCNINJA_RETRY_MAX_ATTEMPTS=3 PCNINJA_RETRY_BACKOFF=2 PCNINJA_MINIMUM_COOLDOWN=5' -f $Version)
+    ('msiexec /i "__Download\{0}" /qn /norestart PCNINJA_ENABLE_SCHEDULE=1 PCNINJA_FREQUENCY=Monthly PCNINJA_MONTHLY_DAY=15 PCNINJA_TIME=03:00 PCNINJA_RUN_AT_STARTUP=1 PCNINJA_STARTUP_DELAY=5 PCNINJA_RUN_IF_MISSED=1 PCNINJA_WAKE_TO_RUN=1 PCNINJA_ALLOW_FIRMWARE=0 PCNINJA_REBOOT_PROMPT=1 PCNINJA_ENABLE_AUTORETRY=1 PCNINJA_RETRY_INITIAL_DELAY=5 PCNINJA_RETRY_MAX_ATTEMPTS=3 PCNINJA_RETRY_BACKOFF=2 PCNINJA_MINIMUM_COOLDOWN=5' -f $publicMsiFileName)
 )
 
 Write-ExampleFile -Name 'Installed-CLI-Examples.cmd' -Lines @(
@@ -377,18 +436,22 @@ Write-ExampleFile -Name 'Installed-CLI-Examples.cmd' -Lines @(
     '"%CLI%" -Mode Configure -EnableSchedule -Frequency Monthly -MonthlyDay 15 -Time 03:00 -RunAtStartup -StartupDelayMinutes 5 -RunIfMissed -WakeToRun -RetryInitialDelayMinutes 5 -MinimumCooldownMinutes 5 -Json',
     '"%CLI%" -Mode RunUpdates -Silent -RunType Manual -Json',
     '"%CLI%" -Mode ResetWindowsUpdate -ConfirmReset -Json',
+    '"%CLI%" -Mode AppUpdateCheck -Json',
+    '"%CLI%" -Mode AppUpdateDownload -Json',
     'exit /b %ERRORLEVEL%'
 )
 
 Write-ExampleFile -Name 'Portable-CLI-Examples.cmd' -Lines @(
     '@echo off',
     'setlocal',
-    ('set "PORTABLE=%~dp0..\PcNinja-WinUpdateTool-Portable-{0}.exe"' -f $Version),
+    ('set "PORTABLE=%~dp0..\{0}"' -f $publicPortableFileName),
     '"%PORTABLE%" /?',
     '"%PORTABLE%" -Mode Status -Json',
     '"%PORTABLE%" -Mode DriverAudit -Json',
     '"%PORTABLE%" -Mode Configure -EnableSchedule -Frequency Monthly -MonthlyDay 15 -Time 03:00 -RunAtStartup -StartupDelayMinutes 5 -RunIfMissed -WakeToRun -RetryInitialDelayMinutes 5 -MinimumCooldownMinutes 5 -Json',
     '"%PORTABLE%" -Mode ResetWindowsUpdate -ConfirmReset -Json',
+    '"%PORTABLE%" -Mode AppUpdateCheck -Json',
+    '"%PORTABLE%" -Mode AppUpdateDownload -Json',
     'exit /b %ERRORLEVEL%'
 )
 
@@ -410,6 +473,11 @@ Write-ExampleFile -Name 'README-Deployment-Examples.txt' -Lines @(
     '',
     '  Portable-CLI-Examples.cmd',
     '    Examples for the portable EXE CLI mode.',
+    '',
+    'App update modes:',
+    '  AppUpdateCheck reads update-manifest.json and reports whether a newer release exists.',
+    '  AppUpdateDownload downloads and verifies the selected release package.',
+    '  AppUpdateInstall is user-initiated and is intended for installed MSI deployments.',
     '',
     'CMD line-continuation rule:',
     '  The ^ character is only for CMD/BAT line continuation.',
@@ -446,7 +514,104 @@ Write-ExampleFile -Name 'README-Deployment-Examples.txt' -Lines @(
     '  %ProgramData%\PcNinja\WinUpdateTool\Logs\MsiConfigure.log'
 )
 
-Get-FileHash -LiteralPath $msiPath, $portableExePath, $hostExePath, $cliExePath -Algorithm SHA256 |
+New-Item -ItemType Directory -Path $publicReleaseDir -Force | Out-Null
+Copy-Item -LiteralPath $msiPath -Destination $publicMsiPath -Force
+Copy-Item -LiteralPath $portableExePath -Destination $publicPortablePath -Force
+Copy-Item -LiteralPath $examplesDir -Destination (Join-Path $publicReleaseDir 'deployment-examples') -Recurse -Force
+
+$publicMsiHash = (Get-FileHash -LiteralPath $publicMsiPath -Algorithm SHA256).Hash
+$publicPortableHash = (Get-FileHash -LiteralPath $publicPortablePath -Algorithm SHA256).Hash
+$releaseBaseUrl = "https://github.com/$Repository/releases/download/$ReleaseTag"
+
+$manifest = [ordered]@{
+    channel = if ($versionInfo -and $versionInfo.releaseChannel) { [string]$versionInfo.releaseChannel } else { 'stable' }
+    publicLabel = $PublicLabel
+    version = $Version
+    minimumSupportedVersion = $Version
+    releaseNotesUrl = "https://github.com/$Repository/releases/tag/$ReleaseTag"
+    msi = [ordered]@{
+        fileName = $publicMsiFileName
+        url = "$releaseBaseUrl/$publicMsiFileName"
+        sha256 = $publicMsiHash
+    }
+    portable = [ordered]@{
+        fileName = $publicPortableFileName
+        url = "$releaseBaseUrl/$publicPortableFileName"
+        sha256 = $publicPortableHash
+    }
+    signing = [ordered]@{
+        required = [bool]($signingCertificate)
+        expectedPublisher = 'PcNinja'
+    }
+}
+
+$manifestPath = Join-Path $publicReleaseDir 'update-manifest.json'
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+
+Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTES.txt") -Encoding UTF8 -Value @(
+    "PcNinja WinUpdate Tool $PublicLabel Release Notes",
+    '',
+    'Release candidate for V2.0.0.',
+    '',
+    'Highlights:',
+    '- Adds shared version manifest foundation.',
+    '- Adds app update check/download/install CLI foundations.',
+    '- Adds public update-manifest.json for GitHub Releases.',
+    '- Keeps Windows Update engine behavior based on V1.1.2.',
+    '',
+    'Notes:',
+    '- This RC is unsigned unless signing was enabled during build.',
+    '- Destructive Windows Update reset testing should be done in a VM.'
+)
+
+$signingStatus = if ($signingCertificate) { 'signed' } else { 'unsigned' }
+Set-Content -LiteralPath (Join-Path $publicReleaseDir 'SIGNING-INSTRUCTIONS.txt') -Encoding UTF8 -Value @(
+    "Signing status: $signingStatus",
+    '',
+    'If this release is unsigned, Windows SmartScreen or endpoint security tools may warn before execution.',
+    '',
+    'After signing, regenerate SHA256SUMS.txt and update-manifest.json.'
+)
+
+Set-Content -LiteralPath (Join-Path $publicReleaseDir 'PUBLIC-RELEASE-README.txt') -Encoding UTF8 -Value @(
+    "PcNinja WinUpdate Tool $PublicLabel Public Release",
+    '',
+    'Files:',
+    "- $publicMsiFileName",
+    "- $publicPortableFileName",
+    '- update-manifest.json',
+    '- deployment-examples\',
+    '- SHA256SUMS.txt',
+    '',
+    'Installed CLI examples:',
+    '  "%ProgramFiles%\PcNinja\WinUpdateTool\PcNinja.WinUpdateTool.Cli.exe" /?',
+    '  "%ProgramFiles%\PcNinja\WinUpdateTool\PcNinja.WinUpdateTool.Cli.exe" -Mode Status -Json',
+    '  "%ProgramFiles%\PcNinja\WinUpdateTool\PcNinja.WinUpdateTool.Cli.exe" -Mode AppUpdateCheck -Json',
+    '',
+    'Portable examples:',
+    "  $publicPortableFileName /?",
+    "  $publicPortableFileName -Mode Status -Json",
+    "  $publicPortableFileName -Mode AppUpdateCheck -Json",
+    '',
+    "Signing status: $signingStatus"
+)
+
+$shaLines = foreach ($file in (Get-ChildItem -LiteralPath $publicReleaseDir -File -Recurse | Sort-Object FullName)) {
+    if ($file.Name -eq 'SHA256SUMS.txt') {
+        continue
+    }
+
+    $relativePath = $file.FullName.Substring($publicReleaseDir.Length).TrimStart('\')
+    '{0}  {1}' -f (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash, $relativePath
+}
+
+Set-Content -LiteralPath (Join-Path $publicReleaseDir 'SHA256SUMS.txt') -Value $shaLines -Encoding ASCII
+
+Compress-Archive -Path (Join-Path $publicReleaseDir '*') -DestinationPath $publicZipPath -Force
+$publicZipHash = (Get-FileHash -LiteralPath $publicZipPath -Algorithm SHA256).Hash
+Set-Content -LiteralPath ($publicZipPath + '.sha256.txt') -Value ("{0}  {1}" -f $publicZipHash, $publicZipFileName) -Encoding ASCII
+
+Get-FileHash -LiteralPath $msiPath, $portableExePath, $hostExePath, $cliExePath, $publicMsiPath, $publicPortablePath, $publicZipPath -Algorithm SHA256 |
     Select-Object Algorithm, Hash, Path
 
 

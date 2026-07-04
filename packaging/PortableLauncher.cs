@@ -11,13 +11,13 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("1.1.2.0")]
-[assembly: AssemblyFileVersion("1.1.2.0")]
-[assembly: AssemblyInformationalVersion("1.1.2.0")]
+[assembly: AssemblyVersion("2.0.4.0")]
+[assembly: AssemblyFileVersion("2.0.4.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC5")]
 
 internal static class PortableLauncher
 {
-    private const string Version = "1.1.2.0";
+    private const string Version = "2.0.4.0";
     private const string PayloadResourceName = "PcNinjaPortablePayload";
 
     [STAThread]
@@ -231,7 +231,7 @@ internal static class PortableLauncher
         string executableName = Path.GetFileName(Application.ExecutablePath);
         if (String.IsNullOrWhiteSpace(executableName))
         {
-            executableName = "PcNinja-WinUpdateTool-V1.1.2-Portable.exe";
+            executableName = "PcNinja-WinUpdateTool-V2.0.0-RC5-Portable.exe";
         }
 
         StringBuilder builder = new StringBuilder();
@@ -244,6 +244,8 @@ internal static class PortableLauncher
         builder.AppendFormat("  {0} -Mode CollectLogs -OutputPath C:\\Temp -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode RunUpdates -Silent -RunType Manual -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode ResetWindowsUpdate -ConfirmReset -Json\r\n", executableName);
+        builder.AppendFormat("  {0} -Mode AppUpdateCheck -Json\r\n", executableName);
+        builder.AppendFormat("  {0} -Mode AppUpdateDownload -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode Configure -ConfigFile C:\\Temp\\pcninja-install.json -Json\r\n", executableName);
         builder.AppendLine();
         builder.AppendLine("Portable extraction path:");

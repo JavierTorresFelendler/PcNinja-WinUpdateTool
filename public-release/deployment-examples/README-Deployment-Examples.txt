@@ -16,6 +16,11 @@ Files:
   Portable-CLI-Examples.cmd
     Examples for the portable EXE CLI mode.
 
+App update modes:
+  AppUpdateCheck reads update-manifest.json and reports whether a newer release exists.
+  AppUpdateDownload downloads and verifies the selected release package.
+  AppUpdateInstall is user-initiated and is intended for installed MSI deployments.
+
 CMD line-continuation rule:
   The ^ character is only for CMD/BAT line continuation.
   It must be the final character on the line. Do not put spaces after it.
@@ -49,4 +54,3 @@ Important:
   The MSI post-install configuration runs elevated as LocalSystem.
   MSI post-install configuration log:
   %ProgramData%\PcNinja\WinUpdateTool\Logs\MsiConfigure.log
-

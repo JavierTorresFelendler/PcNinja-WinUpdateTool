@@ -28,7 +28,20 @@ $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
 $installAssetsDir = Join-Path $installDir 'assets'
 $appIconPath = Join-Path $installAssetsDir 'PcNinja.ico'
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PcNinja WinUpdate Tool'
-$appVersion = '1.1.2.0'
+$appVersion = '2.0.4.0'
+$versionFile = Join-Path $sourceDir 'version.json'
+
+if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
+    try {
+        $versionInfo = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
+        if ($versionInfo.version) {
+            $appVersion = [string]$versionInfo.version
+        }
+    }
+    catch {
+        $appVersion = '2.0.4.0'
+    }
+}
 
 foreach ($path in @($installDir, $installAssetsDir, $programDataDir, $logDir, $startMenuDir)) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -38,7 +51,9 @@ foreach ($path in @($installDir, $installAssetsDir, $programDataDir, $logDir, $s
 
 $files = @(
     'WinUpdateTool.ps1',
+    'WinUpdateTool.V2Ui.ps1',
     'WinUpdateCore.psm1',
+    'version.json',
     'PcNinja.WinUpdateTool.exe',
     'PcNinja.WinUpdateTool.Cli.exe',
     'Launch-WinUpdateTool.vbs',

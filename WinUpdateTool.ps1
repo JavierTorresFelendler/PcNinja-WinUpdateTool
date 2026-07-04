@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet('UI', 'RunUpdates', 'ShowLog', 'DriverReport', 'DriverAudit', 'Status', 'Configure', 'RunOnceTask', 'CollectLogs', 'ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache')]
+    [ValidateSet('UI', 'RunUpdates', 'ShowLog', 'DriverReport', 'DriverAudit', 'Status', 'Configure', 'RunOnceTask', 'CollectLogs', 'ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache', 'AppUpdateCheck', 'AppUpdateDownload', 'AppUpdateInstall')]
     [string]$Mode = 'UI',
 
     [switch]$Silent,
@@ -67,13 +67,52 @@
 
     [string]$OutputPath,
 
+    [string]$ManifestUrl,
+
+    [ValidateSet('Msi', 'Portable')]
+    [string]$UpdatePackageType = 'Msi',
+
+    [string]$UpdateCachePath,
+
     [int]$LogTail = 50
 )
 
 $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot 'WinUpdateCore.psm1'
 Import-Module $modulePath -Force
-$script:PcnToolVersion = '1.1.2.0'
+
+function Get-PcnToolVersionInfo {
+    $defaultInfo = [pscustomobject]@{
+        ProductName = 'PcNinja WinUpdate Tool'
+        PublicLabel = 'V2.0.0-RC5'
+        Version = '2.0.4.0'
+        ReleaseChannel = 'stable'
+        GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
+    }
+
+    $versionFile = Join-Path $PSScriptRoot 'version.json'
+    if (-not (Test-Path -LiteralPath $versionFile -PathType Leaf)) {
+        return $defaultInfo
+    }
+
+    try {
+        $source = Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json
+        return [pscustomobject]@{
+            ProductName = if ($source.productName) { [string]$source.productName } else { $defaultInfo.ProductName }
+            PublicLabel = if ($source.publicLabel) { [string]$source.publicLabel } else { $defaultInfo.PublicLabel }
+            Version = if ($source.version) { [string]$source.version } else { $defaultInfo.Version }
+            ReleaseChannel = if ($source.releaseChannel) { [string]$source.releaseChannel } else { $defaultInfo.ReleaseChannel }
+            GitHubRepository = if ($source.githubRepository) { [string]$source.githubRepository } else { $defaultInfo.GitHubRepository }
+        }
+    }
+    catch {
+        return $defaultInfo
+    }
+}
+
+$script:PcnToolVersionInfo = Get-PcnToolVersionInfo
+$script:PcnToolVersion = $script:PcnToolVersionInfo.Version
+$script:PcnToolPublicLabel = $script:PcnToolVersionInfo.PublicLabel
 $script:PcnCliBoundParameters = $PSBoundParameters
 
 if ($Json) {
@@ -198,6 +237,356 @@ function Get-PcnCliStatus {
         WindowsUpdateActivity = Invoke-PcnCliSafe { Get-PcnWindowsUpdateActivity }
         DotNetFramework = Invoke-PcnCliSafe { Get-PcnDotNetFrameworkVersion }
         RecentLogLines = $recentLogLines
+    }
+}
+
+function Get-PcnObjectProperty {
+    param(
+        [AllowNull()]
+        [object]$InputObject,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if (-not $InputObject) {
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    if (-not $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+function Convert-PcnVersionOrNull {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    try {
+        return [version]$Value
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-PcnDefaultAppUpdateManifestUrl {
+    $repository = [string]$script:PcnToolVersionInfo.GitHubRepository
+    if ([string]::IsNullOrWhiteSpace($repository)) {
+        return $null
+    }
+
+    return "https://raw.githubusercontent.com/$repository/v2-dev/public-release/update-manifest.json"
+}
+
+function Get-PcnDefaultAppUpdateReleaseUrl {
+    $repository = [string]$script:PcnToolVersionInfo.GitHubRepository
+    if ([string]::IsNullOrWhiteSpace($repository)) {
+        return 'https://github.com/'
+    }
+
+    return "https://github.com/$repository/releases"
+}
+
+function Resolve-PcnAppUpdateManifestSource {
+    param([string]$Source)
+
+    if (-not [string]::IsNullOrWhiteSpace($Source)) {
+        return $Source
+    }
+
+    return Get-PcnDefaultAppUpdateManifestUrl
+}
+
+function Get-PcnAppUpdateCacheRoot {
+    param([string]$Path)
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+        New-Item -ItemType Directory -Path $resolved -Force | Out-Null
+        return $resolved
+    }
+
+    $paths = Initialize-PcnWinUpdateFolders
+    $root = Join-Path $paths.DataRoot 'Updates'
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
+    return $root
+}
+
+function Read-PcnAppUpdateManifest {
+    param([string]$Source)
+
+    $resolvedSource = Resolve-PcnAppUpdateManifestSource -Source $Source
+    if ([string]::IsNullOrWhiteSpace($resolvedSource)) {
+        throw 'No app update manifest URL was configured.'
+    }
+
+    $content = $null
+    $isUri = $false
+    $uri = $null
+
+    if ([System.Uri]::TryCreate($resolvedSource, [System.UriKind]::Absolute, [ref]$uri)) {
+        $isUri = $uri.Scheme -in @('http', 'https')
+    }
+
+    if ($isUri) {
+        if ($uri.Scheme -ne 'https') {
+            throw 'App update manifest URL must use HTTPS.'
+        }
+
+        $response = Invoke-WebRequest -Uri $uri.AbsoluteUri -UseBasicParsing
+        $content = [string]$response.Content
+    }
+    else {
+        $manifestPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($resolvedSource)
+        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+            throw "App update manifest was not found: $resolvedSource"
+        }
+
+        $content = Get-Content -LiteralPath $manifestPath -Raw
+    }
+
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        throw 'App update manifest was empty.'
+    }
+
+    [pscustomobject]@{
+        Source = $resolvedSource
+        Manifest = ($content | ConvertFrom-Json)
+    }
+}
+
+function Get-PcnAppUpdatePackage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Manifest,
+
+        [ValidateSet('Msi', 'Portable')]
+        [string]$PackageType = 'Msi'
+    )
+
+    if ($PackageType -eq 'Portable') {
+        return Get-PcnObjectProperty -InputObject $Manifest -Name 'portable'
+    }
+
+    return Get-PcnObjectProperty -InputObject $Manifest -Name 'msi'
+}
+
+function Test-PcnHttpsUrl {
+    param([string]$Url)
+
+    $uri = $null
+    if (-not [System.Uri]::TryCreate($Url, [System.UriKind]::Absolute, [ref]$uri)) {
+        return $false
+    }
+
+    return ($uri.Scheme -eq 'https')
+}
+
+function Invoke-PcnAppUpdateCheck {
+    param(
+        [string]$ManifestSource,
+
+        [ValidateSet('Msi', 'Portable')]
+        [string]$PackageType = 'Msi'
+    )
+
+    $manifestResult = Read-PcnAppUpdateManifest -Source $ManifestSource
+    $manifest = $manifestResult.Manifest
+    $warnings = New-Object System.Collections.Generic.List[string]
+    $errors = New-Object System.Collections.Generic.List[string]
+
+    $latestVersionText = [string](Get-PcnObjectProperty -InputObject $manifest -Name 'version')
+    $latestVersion = Convert-PcnVersionOrNull -Value $latestVersionText
+    $currentVersion = Convert-PcnVersionOrNull -Value $script:PcnToolVersion
+
+    if (-not $latestVersion) {
+        $errors.Add('Manifest version is missing or invalid.') | Out-Null
+    }
+
+    if (-not $currentVersion) {
+        $errors.Add('Current tool version is missing or invalid.') | Out-Null
+    }
+
+    $channel = [string](Get-PcnObjectProperty -InputObject $manifest -Name 'channel')
+    if (-not [string]::IsNullOrWhiteSpace($channel) -and $channel -ne [string]$script:PcnToolVersionInfo.ReleaseChannel) {
+        $warnings.Add("Manifest channel '$channel' differs from current channel '$($script:PcnToolVersionInfo.ReleaseChannel)'.") | Out-Null
+    }
+
+    $releaseNotesUrl = [string](Get-PcnObjectProperty -InputObject $manifest -Name 'releaseNotesUrl')
+    if (-not [string]::IsNullOrWhiteSpace($releaseNotesUrl) -and -not (Test-PcnHttpsUrl -Url $releaseNotesUrl)) {
+        $warnings.Add('Release notes URL is not HTTPS.') | Out-Null
+    }
+
+    $package = Get-PcnAppUpdatePackage -Manifest $manifest -PackageType $PackageType
+    if (-not $package) {
+        $errors.Add("Manifest does not contain a $PackageType package entry.") | Out-Null
+    }
+    else {
+        $packageUrl = [string](Get-PcnObjectProperty -InputObject $package -Name 'url')
+        $packageFileName = [string](Get-PcnObjectProperty -InputObject $package -Name 'fileName')
+        $packageSha256 = [string](Get-PcnObjectProperty -InputObject $package -Name 'sha256')
+
+        if (-not (Test-PcnHttpsUrl -Url $packageUrl)) {
+            $errors.Add("$PackageType package URL must use HTTPS.") | Out-Null
+        }
+
+        if ([string]::IsNullOrWhiteSpace($packageFileName)) {
+            $errors.Add("$PackageType package fileName is missing.") | Out-Null
+        }
+
+        if ([string]::IsNullOrWhiteSpace($packageSha256)) {
+            $errors.Add("$PackageType package SHA256 is missing.") | Out-Null
+        }
+    }
+
+    $isNewer = $false
+    if ($latestVersion -and $currentVersion) {
+        $isNewer = ($latestVersion -gt $currentVersion)
+    }
+
+    $result = if ($errors.Count -gt 0) {
+        'InvalidManifest'
+    }
+    elseif ($isNewer) {
+        'UpdateAvailable'
+    }
+    else {
+        'UpToDate'
+    }
+
+    [pscustomobject]@{
+        Result = $result
+        Success = ($errors.Count -eq 0)
+        Mode = 'AppUpdateCheck'
+        ProductName = [string]$script:PcnToolVersionInfo.ProductName
+        CurrentPublicLabel = [string]$script:PcnToolPublicLabel
+        CurrentVersion = [string]$script:PcnToolVersion
+        ManifestSource = [string]$manifestResult.Source
+        Channel = $channel
+        LatestPublicLabel = [string](Get-PcnObjectProperty -InputObject $manifest -Name 'publicLabel')
+        LatestVersion = $latestVersionText
+        IsNewer = $isNewer
+        PackageType = $PackageType
+        Package = $package
+        ReleaseNotesUrl = $releaseNotesUrl
+        Warnings = @($warnings)
+        Errors = @($errors)
+        Timestamp = (Get-Date).ToString('s')
+    }
+}
+
+function Invoke-PcnAppUpdateDownload {
+    param(
+        [string]$ManifestSource,
+
+        [ValidateSet('Msi', 'Portable')]
+        [string]$PackageType = 'Msi',
+
+        [string]$CachePath
+    )
+
+    $check = Invoke-PcnAppUpdateCheck -ManifestSource $ManifestSource -PackageType $PackageType
+    if (-not $check.Success) {
+        return [pscustomobject]@{
+            Result = 'ManifestValidationFailed'
+            Success = $false
+            Check = $check
+        }
+    }
+
+    if (-not $check.IsNewer) {
+        return [pscustomobject]@{
+            Result = 'NoNewerVersion'
+            Success = $true
+            Check = $check
+        }
+    }
+
+    $package = $check.Package
+    $packageUrl = [string](Get-PcnObjectProperty -InputObject $package -Name 'url')
+    $fileName = [string](Get-PcnObjectProperty -InputObject $package -Name 'fileName')
+    $expectedHash = ([string](Get-PcnObjectProperty -InputObject $package -Name 'sha256')).ToUpperInvariant()
+
+    $cacheRoot = Get-PcnAppUpdateCacheRoot -Path $CachePath
+    $targetPath = Join-Path $cacheRoot $fileName
+
+    Invoke-WebRequest -Uri $packageUrl -UseBasicParsing -OutFile $targetPath
+    $actualHash = (Get-FileHash -LiteralPath $targetPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    $hashMatches = ($actualHash -eq $expectedHash)
+    $signature = Get-AuthenticodeSignature -LiteralPath $targetPath
+
+    Write-PcnWinUpdateLog -Message "App update downloaded: $fileName. SHA256 match: $hashMatches. Signature: $($signature.Status)." -EventID 1090
+
+    [pscustomobject]@{
+        Result = if ($hashMatches) { 'DownloadedAndVerified' } else { 'HashMismatch' }
+        Success = $hashMatches
+        Mode = 'AppUpdateDownload'
+        PackageType = $PackageType
+        FilePath = $targetPath
+        ExpectedSha256 = $expectedHash
+        ActualSha256 = $actualHash
+        SignatureStatus = [string]$signature.Status
+        Check = $check
+        Timestamp = (Get-Date).ToString('s')
+    }
+}
+
+function Invoke-PcnAppUpdateInstall {
+    param(
+        [string]$ManifestSource,
+        [string]$CachePath
+    )
+
+    $download = Invoke-PcnAppUpdateDownload -ManifestSource $ManifestSource -PackageType 'Msi' -CachePath $CachePath
+    if (-not $download.Success) {
+        return [pscustomobject]@{
+            Result = 'DownloadVerificationFailed'
+            Success = $false
+            Download = $download
+        }
+    }
+
+    if ($download.Result -eq 'NoNewerVersion') {
+        return [pscustomobject]@{
+            Result = 'NoNewerVersion'
+            Success = $true
+            Mode = 'AppUpdateInstall'
+            Download = $download
+            Timestamp = (Get-Date).ToString('s')
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$download.FilePath)) {
+        return [pscustomobject]@{
+            Result = 'InstallerPathMissing'
+            Success = $false
+            Mode = 'AppUpdateInstall'
+            Download = $download
+            Timestamp = (Get-Date).ToString('s')
+        }
+    }
+
+    $msiArguments = '/i "{0}" /passive /norestart' -f $download.FilePath
+    $process = Start-Process -FilePath 'msiexec.exe' -ArgumentList $msiArguments -PassThru
+
+    Write-PcnWinUpdateLog -Message "App update MSI handoff started. PID: $($process.Id). Path: $($download.FilePath)" -EventID 1091
+
+    [pscustomobject]@{
+        Result = 'InstallerHandoffStarted'
+        Success = $true
+        Mode = 'AppUpdateInstall'
+        MsiPath = $download.FilePath
+        ProcessId = $process.Id
+        Note = 'The running app should exit after this handoff so MSI can replace files.'
+        Download = $download
+        Timestamp = (Get-Date).ToString('s')
     }
 }
 
@@ -787,6 +1176,16 @@ if ($Mode -eq 'Status') {
     exit 0
 }
 
+if ($Mode -eq 'AppUpdateCheck') {
+    try {
+        Write-PcnCliObject -InputObject (Invoke-PcnAppUpdateCheck -ManifestSource $ManifestUrl -PackageType $UpdatePackageType) -Depth 12
+        exit 0
+    }
+    catch {
+        Stop-PcnCliError -Message $_.Exception.Message
+    }
+}
+
 if ($Mode -in @('DriverReport', 'DriverAudit')) {
     try {
         $report = Export-PcnDriverInventoryReport
@@ -834,6 +1233,36 @@ if ($Mode -in @('ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache')) {
         Write-PcnCliObject -InputObject $result -Depth 10
 
         if ($result.Result -in @('Succeeded', 'SucceededWithWarnings')) {
+            exit 0
+        }
+
+        exit 1
+    }
+    catch {
+        Stop-PcnCliError -Message $_.Exception.Message
+    }
+}
+
+if ($Mode -eq 'AppUpdateDownload') {
+    try {
+        $downloadResult = Invoke-PcnAppUpdateDownload -ManifestSource $ManifestUrl -PackageType $UpdatePackageType -CachePath $UpdateCachePath
+        Write-PcnCliObject -InputObject $downloadResult -Depth 12
+        if ($downloadResult.Success) {
+            exit 0
+        }
+
+        exit 1
+    }
+    catch {
+        Stop-PcnCliError -Message $_.Exception.Message
+    }
+}
+
+if ($Mode -eq 'AppUpdateInstall') {
+    try {
+        $installResult = Invoke-PcnAppUpdateInstall -ManifestSource $ManifestUrl -CachePath $UpdateCachePath
+        Write-PcnCliObject -InputObject $installResult -Depth 12
+        if ($installResult.Success) {
             exit 0
         }
 
@@ -900,6 +1329,15 @@ if ($Mode -eq 'CollectLogs') {
     }
 }
 
+if ($Mode -eq 'UI') {
+    $v2UiPath = Join-Path $PSScriptRoot 'WinUpdateTool.V2Ui.ps1'
+    if (Test-Path -LiteralPath $v2UiPath -PathType Leaf) {
+        . $v2UiPath
+        Show-PcnWinUpdateV2Ui
+        exit 0
+    }
+}
+
 try {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -908,7 +1346,7 @@ Add-Type -AssemblyName System.Drawing
 Initialize-PcnWinUpdateFolders | Out-Null
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'PcNinja WinUpdate Tool'
+$form.Text = "PcNinja WinUpdate Tool $script:PcnToolPublicLabel"
 $workingArea = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 $initialWidth = [Math]::Min(1080, [Math]::Max(980, $workingArea.Width - 40))
 $initialHeight = [Math]::Min(860, [Math]::Max(760, $workingArea.Height - 60))
@@ -930,7 +1368,7 @@ if (Test-Path -LiteralPath $iconPath) {
 
 $titleFont = New-Object System.Drawing.Font('Segoe UI Semibold', 17, [System.Drawing.FontStyle]::Bold)
 $sectionFont = New-Object System.Drawing.Font('Segoe UI Semibold', 12, [System.Drawing.FontStyle]::Bold)
-$script:PcnUiCurrentTheme = 'Light'
+$script:PcnUiCurrentTheme = 'Dark'
 $script:PcnThemePalette = $null
 $script:pcnLoadingUiConfig = $false
 
@@ -1013,6 +1451,17 @@ function Invoke-PcnUiOpenUrl {
 
 function Get-PcnWindowsImageDownloadUrl {
     return 'https://win11.pcninja.pro/'
+}
+
+function Get-PcnUiUpdateDownloadFolder {
+    $userProfile = [Environment]::GetFolderPath('UserProfile')
+    if ([string]::IsNullOrWhiteSpace($userProfile)) {
+        return (Get-PcnAppUpdateCacheRoot)
+    }
+
+    $downloads = Join-Path $userProfile 'Downloads'
+    New-Item -ItemType Directory -Path $downloads -Force | Out-Null
+    return $downloads
 }
 
 function New-PcnUiLinkLabel {
@@ -1115,14 +1564,14 @@ if (Test-Path -LiteralPath $logoPath) {
 }
 
 $title = New-Object System.Windows.Forms.Label
-$title.Text = 'PcNinja WinUpdate Tool'
+$title.Text = "PcNinja WinUpdate Tool $script:PcnToolPublicLabel"
 $title.Font = $titleFont
 $title.AutoSize = $true
 $title.Location = New-Object System.Drawing.Point(92, 10)
 $form.Controls.Add($title)
 
 $subtitle = New-Object System.Windows.Forms.Label
-$subtitle.Text = 'Search, download, install, and schedule Windows updates.'
+$subtitle.Text = 'V2 dashboard: Windows updates, drivers, schedules, logs, and GitHub release updates.'
 $subtitle.AutoSize = $true
 $subtitle.Location = New-Object System.Drawing.Point(94, 42)
 $form.Controls.Add($subtitle)
@@ -1137,6 +1586,15 @@ $siteLink.Add_LinkClicked({
     Start-Process 'https://www.PcNinja.Pro' | Out-Null
 })
 $form.Controls.Add($siteLink)
+
+$buildBadge = New-Object System.Windows.Forms.Label
+$buildBadge.Text = "Build: $script:PcnToolVersion | Channel: $($script:PcnToolVersionInfo.ReleaseChannel)"
+$buildBadge.AutoSize = $false
+$buildBadge.TextAlign = 'MiddleRight'
+$buildBadge.Location = New-Object System.Drawing.Point -ArgumentList ($form.ClientSize.Width - 440), 12
+$buildBadge.Size = New-Object System.Drawing.Size(280, 24)
+$buildBadge.Anchor = 'Top,Right'
+$form.Controls.Add($buildBadge)
 
 $tabControl = New-Object System.Windows.Forms.TabControl
 $tabControl.Location = New-Object System.Drawing.Point(18, 78)
@@ -1263,7 +1721,7 @@ $dashboardSummaryBox = New-Object System.Windows.Forms.GroupBox
 $dashboardSummaryBox.Text = 'System Update Overview'
 $dashboardSummaryBox.Font = $sectionFont
 $dashboardSummaryBox.Location = New-Object System.Drawing.Point(18, 14)
-$dashboardSummaryBox.Size = New-Object System.Drawing.Size(984, 210)
+$dashboardSummaryBox.Size = New-Object System.Drawing.Size(984, 230)
 $dashboardSummaryBox.Anchor = 'Top,Left,Right'
 $dashboardTab.Controls.Add($dashboardSummaryBox)
 
@@ -1321,10 +1779,19 @@ $dashboardDriverAudit.Size = New-Object System.Drawing.Size(944, 28)
 $dashboardDriverAudit.Anchor = 'Top,Left,Right'
 $dashboardSummaryBox.Controls.Add($dashboardDriverAudit)
 
+$dashboardToolVersion = New-Object System.Windows.Forms.Label
+$dashboardToolVersion.Text = "Tool: $script:PcnToolPublicLabel ($script:PcnToolVersion) | GitHub update channel: ready"
+$dashboardToolVersion.AutoSize = $false
+$dashboardToolVersion.Font = $form.Font
+$dashboardToolVersion.Location = New-Object System.Drawing.Point(20, 204)
+$dashboardToolVersion.Size = New-Object System.Drawing.Size(944, 24)
+$dashboardToolVersion.Anchor = 'Top,Left,Right'
+$dashboardSummaryBox.Controls.Add($dashboardToolVersion)
+
 $dashboardActionsBox = New-Object System.Windows.Forms.GroupBox
 $dashboardActionsBox.Text = 'Quick Actions'
 $dashboardActionsBox.Font = $sectionFont
-$dashboardActionsBox.Location = New-Object System.Drawing.Point(18, 238)
+$dashboardActionsBox.Location = New-Object System.Drawing.Point(18, 258)
 $dashboardActionsBox.Size = New-Object System.Drawing.Size(984, 84)
 $dashboardActionsBox.Anchor = 'Top,Left,Right'
 $dashboardTab.Controls.Add($dashboardActionsBox)
@@ -1357,15 +1824,60 @@ $dashboardActionsBox.Controls.Add($dashboardRefreshButton)
 $dashboardRunOptionsBox = New-Object System.Windows.Forms.GroupBox
 $dashboardRunOptionsBox.Text = 'Run Options'
 $dashboardRunOptionsBox.Font = $sectionFont
-$dashboardRunOptionsBox.Location = New-Object System.Drawing.Point(18, 340)
+$dashboardRunOptionsBox.Location = New-Object System.Drawing.Point(18, 360)
 $dashboardRunOptionsBox.Size = New-Object System.Drawing.Size(984, 82)
 $dashboardRunOptionsBox.Anchor = 'Top,Left,Right'
 $dashboardTab.Controls.Add($dashboardRunOptionsBox)
 
+$dashboardAppUpdateBox = New-Object System.Windows.Forms.GroupBox
+$dashboardAppUpdateBox.Text = 'Tool Update'
+$dashboardAppUpdateBox.Font = $sectionFont
+$dashboardAppUpdateBox.Location = New-Object System.Drawing.Point(18, 460)
+$dashboardAppUpdateBox.Size = New-Object System.Drawing.Size(984, 104)
+$dashboardAppUpdateBox.Anchor = 'Top,Left,Right'
+$dashboardTab.Controls.Add($dashboardAppUpdateBox)
+
+$dashboardToolUpdateStatus = New-Object System.Windows.Forms.Label
+$dashboardToolUpdateStatus.Text = "Current: $script:PcnToolPublicLabel. Click Check to read the GitHub Releases manifest."
+$dashboardToolUpdateStatus.AutoSize = $false
+$dashboardToolUpdateStatus.Font = $form.Font
+$dashboardToolUpdateStatus.Location = New-Object System.Drawing.Point(20, 30)
+$dashboardToolUpdateStatus.Size = New-Object System.Drawing.Size(440, 56)
+$dashboardToolUpdateStatus.Anchor = 'Top,Left,Right'
+$dashboardAppUpdateBox.Controls.Add($dashboardToolUpdateStatus)
+
+$dashboardCheckToolUpdateButton = New-Object System.Windows.Forms.Button
+$dashboardCheckToolUpdateButton.Text = 'Check Tool Update'
+$dashboardCheckToolUpdateButton.Location = New-Object System.Drawing.Point(500, 28)
+$dashboardCheckToolUpdateButton.Size = New-Object System.Drawing.Size(136, 34)
+$dashboardCheckToolUpdateButton.Anchor = 'Top,Right'
+$dashboardAppUpdateBox.Controls.Add($dashboardCheckToolUpdateButton)
+
+$dashboardDownloadToolUpdateButton = New-Object System.Windows.Forms.Button
+$dashboardDownloadToolUpdateButton.Text = 'Download MSI'
+$dashboardDownloadToolUpdateButton.Location = New-Object System.Drawing.Point(650, 28)
+$dashboardDownloadToolUpdateButton.Size = New-Object System.Drawing.Size(130, 34)
+$dashboardDownloadToolUpdateButton.Anchor = 'Top,Right'
+$dashboardAppUpdateBox.Controls.Add($dashboardDownloadToolUpdateButton)
+
+$dashboardInstallToolUpdateButton = New-Object System.Windows.Forms.Button
+$dashboardInstallToolUpdateButton.Text = 'Install MSI'
+$dashboardInstallToolUpdateButton.Location = New-Object System.Drawing.Point(794, 28)
+$dashboardInstallToolUpdateButton.Size = New-Object System.Drawing.Size(122, 34)
+$dashboardInstallToolUpdateButton.Anchor = 'Top,Right'
+$dashboardAppUpdateBox.Controls.Add($dashboardInstallToolUpdateButton)
+
+$dashboardOpenReleaseButton = New-Object System.Windows.Forms.Button
+$dashboardOpenReleaseButton.Text = 'Open GitHub Release Page'
+$dashboardOpenReleaseButton.Location = New-Object System.Drawing.Point(500, 66)
+$dashboardOpenReleaseButton.Size = New-Object System.Drawing.Size(416, 28)
+$dashboardOpenReleaseButton.Anchor = 'Top,Right'
+$dashboardAppUpdateBox.Controls.Add($dashboardOpenReleaseButton)
+
 $dashboardRepairBox = New-Object System.Windows.Forms.GroupBox
 $dashboardRepairBox.Text = 'Repair Tools'
 $dashboardRepairBox.Font = $sectionFont
-$dashboardRepairBox.Location = New-Object System.Drawing.Point(18, 492)
+$dashboardRepairBox.Location = New-Object System.Drawing.Point(18, 584)
 $dashboardRepairBox.Size = New-Object System.Drawing.Size(984, 128)
 $dashboardRepairBox.Anchor = 'Top,Left,Right'
 $dashboardTab.Controls.Add($dashboardRepairBox)
@@ -1396,7 +1908,7 @@ $themeCombo = New-Object System.Windows.Forms.ComboBox
 $themeCombo.DropDownStyle = 'DropDownList'
 [void]$themeCombo.Items.Add('Light')
 [void]$themeCombo.Items.Add('Dark')
-$themeCombo.SelectedItem = 'Light'
+$themeCombo.SelectedItem = 'Dark'
 $themeCombo.Location = New-Object System.Drawing.Point(750, 31)
 $themeCombo.Size = New-Object System.Drawing.Size(130, 28)
 
@@ -2357,6 +2869,10 @@ function Set-PcnDarkButtonAccents {
         $dashboardDriverAuditButton,
         $dashboardOpenLogsButton,
         $dashboardRefreshButton,
+        $dashboardCheckToolUpdateButton,
+        $dashboardDownloadToolUpdateButton,
+        $dashboardInstallToolUpdateButton,
+        $dashboardOpenReleaseButton,
         $featureUpdateButton,
         $pcNinjaClassesButton,
         $saveSchedule,
@@ -2389,6 +2905,7 @@ function Update-PcnDarkAccentInvalidation {
         $dashboardSummaryBox,
         $dashboardActionsBox,
         $dashboardRunOptionsBox,
+        $dashboardAppUpdateBox,
         $dashboardRepairBox,
         $manualBox,
         $dashboardFeatureUpdateBox,
@@ -2883,7 +3400,7 @@ function Set-PcnUiScheduleFields {
 
 function Get-PcnUiConfig {
     [pscustomobject]@{
-        ConfigVersion = 10
+        ConfigVersion = 11
         Enabled = [bool]$uiEnableSchedule.Checked
         Frequency = [string]$uiFrequency.SelectedItem
         Time = $timePicker.Value.ToString('HH:mm')
@@ -2925,7 +3442,15 @@ function Load-PcnUiConfig {
         $retryMax.Value = [Math]::Min($retryMax.Maximum, [Math]::Max($retryMax.Minimum, [int]$config.RetryMaxAttempts))
         $retryCooldown.Value = [Math]::Min($retryCooldown.Maximum, [Math]::Max($retryCooldown.Minimum, [int]$config.MinimumCooldownMinutes))
 
-        $theme = if ($config.PSObject.Properties['DisplayTheme'] -and [string]$config.DisplayTheme -eq 'Dark') { 'Dark' } else { 'Light' }
+        $configVersion = 0
+        try {
+            $configVersion = [int]$config.ConfigVersion
+        }
+        catch {
+            $configVersion = 0
+        }
+
+        $theme = if ($configVersion -ge 11 -and $config.PSObject.Properties['DisplayTheme'] -and [string]$config.DisplayTheme -eq 'Light') { 'Light' } else { 'Dark' }
         $themeCombo.SelectedItem = $theme
         Apply-PcnUiTheme -Theme $theme
 
@@ -3134,6 +3659,184 @@ function Invoke-PcnUiWindowsUpdateReset {
     catch {
         $footer.Text = 'Could not start Windows Update reset.'
         [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Reset Error', 'OK', 'Error') | Out-Null
+    }
+}
+
+function Format-PcnUiAppUpdateResult {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Result
+    )
+
+    $latestLabel = if ($Result.LatestPublicLabel) { [string]$Result.LatestPublicLabel } else { [string]$Result.LatestVersion }
+    if ([string]::IsNullOrWhiteSpace($latestLabel)) {
+        $latestLabel = 'unknown'
+    }
+
+    switch ([string]$Result.Result) {
+        'UpdateAvailable' {
+            return "Update available: $latestLabel. Package: $($Result.PackageType)."
+        }
+        'UpToDate' {
+            return "Tool is up to date: $($Result.CurrentPublicLabel)."
+        }
+        'InvalidManifest' {
+            return "Manifest problem: $($Result.Errors -join '; ')"
+        }
+        default {
+            return "Update check result: $($Result.Result)."
+        }
+    }
+}
+
+function Invoke-PcnUiToolUpdateCheck {
+    try {
+        $dashboardCheckToolUpdateButton.Enabled = $false
+        $footer.Text = 'Checking GitHub release manifest...'
+        $dashboardToolUpdateStatus.Text = 'Checking GitHub Releases for update-manifest.json...'
+        [System.Windows.Forms.Application]::DoEvents()
+
+        $result = Invoke-PcnAppUpdateCheck -PackageType 'Msi'
+        $summary = Format-PcnUiAppUpdateResult -Result $result
+        $dashboardToolUpdateStatus.Text = $summary
+        $footer.Text = $summary
+
+        $details = @(
+            $summary,
+            '',
+            "Current: $($result.CurrentPublicLabel) ($($result.CurrentVersion))",
+            "Latest: $($result.LatestPublicLabel) ($($result.LatestVersion))",
+            "Manifest: $($result.ManifestSource)"
+        )
+
+        if ($result.Warnings -and $result.Warnings.Count -gt 0) {
+            $details += ''
+            $details += 'Warnings:'
+            $details += @($result.Warnings)
+        }
+
+        if ($result.Errors -and $result.Errors.Count -gt 0) {
+            $details += ''
+            $details += 'Errors:'
+            $details += @($result.Errors)
+        }
+
+        [System.Windows.Forms.MessageBox]::Show(($details -join "`r`n"), 'Tool Update Check', 'OK', 'Information') | Out-Null
+    }
+    catch {
+        $message = "Could not check GitHub update manifest. $($_.Exception.Message)"
+        $dashboardToolUpdateStatus.Text = $message
+        $footer.Text = 'Tool update check failed.'
+        [System.Windows.Forms.MessageBox]::Show(
+            "$message`r`n`r`nFor local RC builds this is expected until update-manifest.json is published in GitHub Releases.",
+            'Tool Update Check',
+            'OK',
+            'Warning'
+        ) | Out-Null
+    }
+    finally {
+        $dashboardCheckToolUpdateButton.Enabled = $true
+    }
+}
+
+function Invoke-PcnUiToolUpdateDownload {
+    try {
+        $dashboardDownloadToolUpdateButton.Enabled = $false
+        $downloadFolder = Get-PcnUiUpdateDownloadFolder
+        $footer.Text = 'Downloading tool update MSI...'
+        $dashboardToolUpdateStatus.Text = "Downloading verified MSI to $downloadFolder..."
+        [System.Windows.Forms.Application]::DoEvents()
+
+        $result = Invoke-PcnAppUpdateDownload -PackageType 'Msi' -CachePath $downloadFolder
+        if ($result.Result -eq 'NoNewerVersion') {
+            $summary = 'No newer MSI is available from the release manifest.'
+        }
+        elseif ($result.Success) {
+            $summary = "Downloaded and verified MSI: $($result.FilePath)"
+        }
+        else {
+            $summary = "Download failed: $($result.Result)"
+        }
+
+        $dashboardToolUpdateStatus.Text = $summary
+        $footer.Text = $summary
+        [System.Windows.Forms.MessageBox]::Show($summary, 'Tool Update Download', 'OK', 'Information') | Out-Null
+    }
+    catch {
+        $message = "Could not download tool update. $($_.Exception.Message)"
+        $dashboardToolUpdateStatus.Text = $message
+        $footer.Text = 'Tool update download failed.'
+        [System.Windows.Forms.MessageBox]::Show(
+            "$message`r`n`r`nThe app downloads from GitHub Releases only after a release manifest exists.",
+            'Tool Update Download',
+            'OK',
+            'Warning'
+        ) | Out-Null
+    }
+    finally {
+        $dashboardDownloadToolUpdateButton.Enabled = $true
+    }
+}
+
+function Invoke-PcnUiToolUpdateInstall {
+    try {
+        $answer = [System.Windows.Forms.MessageBox]::Show(
+            "This will download the verified MSI from GitHub Releases, start Windows Installer, and close this app so files can be replaced.`r`n`r`nContinue?",
+            'Install Tool Update',
+            'YesNo',
+            'Question'
+        )
+
+        if ($answer -ne 'Yes') {
+            $footer.Text = 'Tool update install cancelled.'
+            return
+        }
+
+        $dashboardInstallToolUpdateButton.Enabled = $false
+        $downloadFolder = Get-PcnUiUpdateDownloadFolder
+        $footer.Text = 'Downloading and starting MSI update...'
+        $dashboardToolUpdateStatus.Text = "Downloading verified MSI to $downloadFolder..."
+        [System.Windows.Forms.Application]::DoEvents()
+
+        $result = Invoke-PcnAppUpdateInstall -CachePath $downloadFolder
+        if ($result.Result -eq 'NoNewerVersion') {
+            $dashboardToolUpdateStatus.Text = 'No newer MSI is available from the release manifest.'
+            $footer.Text = 'No newer tool update is available.'
+            [System.Windows.Forms.MessageBox]::Show('No newer MSI is available from the release manifest.', 'Install Tool Update', 'OK', 'Information') | Out-Null
+            return
+        }
+
+        if (-not $result.Success) {
+            $summary = "Could not start MSI update: $($result.Result)"
+            $dashboardToolUpdateStatus.Text = $summary
+            $footer.Text = $summary
+            [System.Windows.Forms.MessageBox]::Show($summary, 'Install Tool Update', 'OK', 'Warning') | Out-Null
+            return
+        }
+
+        $dashboardToolUpdateStatus.Text = "MSI update started. Installer PID: $($result.ProcessId)."
+        $footer.Text = 'MSI update started. Closing app.'
+        [System.Windows.Forms.MessageBox]::Show(
+            "Windows Installer has started.`r`n`r`nThe app will close now so the MSI can replace files.",
+            'Install Tool Update',
+            'OK',
+            'Information'
+        ) | Out-Null
+        $form.Close()
+    }
+    catch {
+        $message = "Could not start tool update install. $($_.Exception.Message)"
+        $dashboardToolUpdateStatus.Text = $message
+        $footer.Text = 'Tool update install failed.'
+        [System.Windows.Forms.MessageBox]::Show(
+            "$message`r`n`r`nThis usually means the GitHub Release manifest is not published yet or the MSI could not be downloaded.",
+            'Install Tool Update',
+            'OK',
+            'Warning'
+        ) | Out-Null
+    }
+    finally {
+        $dashboardInstallToolUpdateButton.Enabled = $true
     }
 }
 
@@ -3435,6 +4138,22 @@ $dashboardRefreshButton.Add_Click({
 
 $dashboardResetWuButton.Add_Click({
     Invoke-PcnUiWindowsUpdateReset
+})
+
+$dashboardCheckToolUpdateButton.Add_Click({
+    Invoke-PcnUiToolUpdateCheck
+})
+
+$dashboardDownloadToolUpdateButton.Add_Click({
+    Invoke-PcnUiToolUpdateDownload
+})
+
+$dashboardInstallToolUpdateButton.Add_Click({
+    Invoke-PcnUiToolUpdateInstall
+})
+
+$dashboardOpenReleaseButton.Add_Click({
+    Invoke-PcnUiOpenUrl -Url (Get-PcnDefaultAppUpdateReleaseUrl)
 })
 
 $featureUpdateButton.Add_Click({

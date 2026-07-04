@@ -1,0 +1,21 @@
+{
+  "channel": "{ReleaseChannel}",
+  "publicLabel": "{PublicLabel}",
+  "version": "{Version}",
+  "minimumSupportedVersion": "2.0.0.0",
+  "releaseNotesUrl": "{ReleaseNotesUrl}",
+  "msi": {
+    "fileName": "PcNinja-WinUpdateTool-{PublicLabel}-Setup-x64.msi",
+    "url": "{MsiUrl}",
+    "sha256": "{MsiSha256}"
+  },
+  "portable": {
+    "fileName": "PcNinja-WinUpdateTool-{PublicLabel}-Portable.exe",
+    "url": "{PortableUrl}",
+    "sha256": "{PortableSha256}"
+  },
+  "signing": {
+    "required": false,
+    "expectedPublisher": "PcNinja"
+  }
+}

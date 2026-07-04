@@ -909,7 +909,7 @@ function Get-PcnDotNetFrameworkVersion {
 
 function Get-PcnDefaultConfig {
     [pscustomobject]@{
-        ConfigVersion = 10
+        ConfigVersion = 11
         Enabled = $false
         Frequency = 'Daily'
         Time = '03:00'
@@ -926,7 +926,7 @@ function Get-PcnDefaultConfig {
         RetryMaxAttempts = 3
         RetryBackoffMultiplier = 2
         MinimumCooldownMinutes = 5
-        DisplayTheme = 'Light'
+        DisplayTheme = 'Dark'
         LastSaved = $null
     }
 }

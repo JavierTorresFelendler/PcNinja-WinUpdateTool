@@ -5,7 +5,7 @@
   <Package
     Name="PcNinja WinUpdate Tool"
     Manufacturer="PcNinja"
-    Version="1.1.2.0"
+    Version="$(ProductVersion)"
     UpgradeCode="{7BD3183C-C7D9-4F0C-BAE9-FF143A450F53}"
     Scope="perMachine">
 
@@ -81,9 +81,11 @@
         <File Id="HostExe" Source="$(SourceDir)\PcNinja.WinUpdateTool.exe" KeyPath="yes" />
         <File Id="CliExe" Source="$(SourceDir)\PcNinja.WinUpdateTool.Cli.exe" />
         <File Id="WinUpdateToolPs1" Source="$(SourceDir)\WinUpdateTool.ps1" />
+        <File Id="WinUpdateToolV2UiPs1" Source="$(SourceDir)\WinUpdateTool.V2Ui.ps1" />
         <File Id="WinUpdateCorePsm1" Source="$(SourceDir)\WinUpdateCore.psm1" />
         <File Id="LaunchVbs" Source="$(SourceDir)\Launch-WinUpdateTool.vbs" />
         <File Id="ReadmeMd" Source="$(SourceDir)\README.md" />
+        <File Id="VersionJson" Source="$(SourceDir)\version.json" />
       </Component>
 
       <Component Id="MsiCleanupComponent" Directory="INSTALLFOLDER" Guid="{32077948-9FA0-4B3B-B2C1-F7A6934523E2}">
@@ -214,6 +216,14 @@
       Impersonate="no"
       Return="ignore" />
 
+    <CustomAction
+      Id="CloseRunningPcNinjaWinUpdateTool"
+      Directory="INSTALLFOLDER"
+      ExeCommand='[SystemFolder]cmd.exe /c taskkill /IM PcNinja.WinUpdateTool.exe /T /F &amp; taskkill /IM PcNinja.WinUpdateTool.Cli.exe /T /F'
+      Execute="deferred"
+      Impersonate="no"
+      Return="ignore" />
+
     <CustomAction Id="SetPcnEs" Property="PCN_ES" Value="[PCNINJA_ENABLE_SCHEDULE]" />
     <CustomAction Id="SetPcnFr" Property="PCN_FR" Value="[PCNINJA_FREQUENCY]" />
     <CustomAction Id="SetPcnTm" Property="PCN_TM" Value="[PCNINJA_TIME]" />
@@ -256,6 +266,11 @@
       <Custom Action="SetPcnRa" Before="ConfigureAfterInstall" Condition="PCNINJA_RETRY_MAX_ATTEMPTS AND NOT PCN_RA" />
       <Custom Action="SetPcnBo" Before="ConfigureAfterInstall" Condition="PCNINJA_RETRY_BACKOFF AND NOT PCN_BO" />
       <Custom Action="SetPcnCd" Before="ConfigureAfterInstall" Condition="PCNINJA_MINIMUM_COOLDOWN AND NOT PCN_CD" />
+
+      <Custom
+        Action="CloseRunningPcNinjaWinUpdateTool"
+        Before="InstallFiles"
+        Condition='NOT REMOVE' />
 
       <Custom
         Action="ConfigureAfterInstall"

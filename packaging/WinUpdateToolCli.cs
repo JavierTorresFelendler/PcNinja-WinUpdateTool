@@ -9,13 +9,13 @@ using System.Text;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("1.1.2.0")]
-[assembly: AssemblyFileVersion("1.1.2.0")]
-[assembly: AssemblyInformationalVersion("1.1.2.0")]
+[assembly: AssemblyVersion("2.0.4.0")]
+[assembly: AssemblyFileVersion("2.0.4.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC5")]
 
 internal static class WinUpdateToolCli
 {
-    private const string Version = "1.1.2.0";
+    private const string Version = "V2.0.0-RC5";
 
     private static int Main(string[] args)
     {
@@ -149,11 +149,14 @@ internal static class WinUpdateToolCli
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode CollectLogs -OutputPath C:\\Temp -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode RunUpdates -Silent -RunType Manual -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode ResetWindowsUpdate -ConfirmReset -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateCheck -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateDownload -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateInstall -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Configure -EnableSchedule -Frequency Monthly -MonthlyDay 15 -Time 03:00 -WakeToRun");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Configure -ConfigFile C:\\Temp\\pcninja-install.json -Json");
         Console.WriteLine();
         Console.WriteLine("Modes:");
-        Console.WriteLine("  UI, Status, RunUpdates, ResetWindowsUpdate, Configure, DriverAudit, DriverReport, CollectLogs, ShowLog, RunOnceTask");
+        Console.WriteLine("  UI, Status, RunUpdates, ResetWindowsUpdate, Configure, DriverAudit, DriverReport, CollectLogs, ShowLog, RunOnceTask, AppUpdateCheck, AppUpdateDownload, AppUpdateInstall");
         Console.WriteLine();
         Console.WriteLine("Common options:");
         Console.WriteLine("  -Json");
@@ -164,6 +167,9 @@ internal static class WinUpdateToolCli
         Console.WriteLine("  -AllowStopBackgroundActivity");
         Console.WriteLine("  -ConfirmReset");
         Console.WriteLine("  -ForceReset");
+        Console.WriteLine("  -ManifestUrl <url-or-local-json-path>");
+        Console.WriteLine("  -UpdatePackageType Msi|Portable");
+        Console.WriteLine("  -UpdateCachePath <folder>");
         Console.WriteLine();
         Console.WriteLine("Schedule options:");
         Console.WriteLine("  -EnableSchedule | -DisableSchedule");

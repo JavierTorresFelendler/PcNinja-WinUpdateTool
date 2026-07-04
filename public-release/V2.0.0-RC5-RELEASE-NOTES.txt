@@ -1,0 +1,13 @@
+﻿PcNinja WinUpdate Tool V2.0.0-RC5 Release Notes
+
+Release candidate for V2.0.0.
+
+Highlights:
+- Adds shared version manifest foundation.
+- Adds app update check/download/install CLI foundations.
+- Adds public update-manifest.json for GitHub Releases.
+- Keeps Windows Update engine behavior based on V1.1.2.
+
+Notes:
+- This RC is unsigned unless signing was enabled during build.
+- Destructive Windows Update reset testing should be done in a VM.

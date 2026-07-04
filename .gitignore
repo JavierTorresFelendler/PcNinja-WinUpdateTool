@@ -15,6 +15,9 @@ bin/
 obj/
 TestResults/
 
+release-output/*
+!release-output/.gitkeep
+
 *.user
 *.suo
 .vs/
