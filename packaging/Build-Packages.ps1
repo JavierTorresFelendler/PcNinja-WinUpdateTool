@@ -546,7 +546,8 @@ $manifest = [ordered]@{
 }
 
 $manifestPath = Join-Path $publicReleaseDir 'update-manifest.json'
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 8), $utf8NoBom)
 
 Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTES.txt") -Encoding UTF8 -Value @(
     "PcNinja WinUpdate Tool $PublicLabel Release Notes",

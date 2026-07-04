@@ -356,6 +356,8 @@ function Read-PcnAppUpdateManifest {
         throw 'App update manifest was empty.'
     }
 
+    $content = $content.TrimStart([char]0xFEFF)
+
     [pscustomobject]@{
         Source = $resolvedSource
         Manifest = ($content | ConvertFrom-Json)
