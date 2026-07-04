@@ -282,7 +282,7 @@ function Get-PcnDefaultAppUpdateManifestUrl {
         return $null
     }
 
-    return "https://raw.githubusercontent.com/$repository/v2-dev/public-release/update-manifest.json"
+    return "https://api.github.com/repos/$repository/contents/public-release/update-manifest.json?ref=v2-dev"
 }
 
 function Get-PcnDefaultAppUpdateReleaseUrl {
@@ -341,7 +341,24 @@ function Read-PcnAppUpdateManifest {
         }
 
         $response = Invoke-WebRequest -Uri $uri.AbsoluteUri -UseBasicParsing
-        $content = [string]$response.Content
+        if ($response.Content -is [byte[]]) {
+            $content = [System.Text.Encoding]::UTF8.GetString($response.Content)
+        }
+        else {
+            $content = [string]$response.Content
+        }
+
+        if ($uri.Host -ieq 'api.github.com' -and $uri.AbsolutePath -match '/contents/') {
+            $apiContent = $content.TrimStart([char]0xFEFF) | ConvertFrom-Json
+            if ([string](Get-PcnObjectProperty -InputObject $apiContent -Name 'encoding') -eq 'base64') {
+                $encodedManifest = ([string](Get-PcnObjectProperty -InputObject $apiContent -Name 'content')) -replace '\s', ''
+                if ([string]::IsNullOrWhiteSpace($encodedManifest)) {
+                    throw 'GitHub contents API response did not include manifest content.'
+                }
+
+                $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($encodedManifest))
+            }
+        }
     }
     else {
         $manifestPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($resolvedSource)
