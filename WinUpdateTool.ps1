@@ -6,6 +6,14 @@ param(
 
     [switch]$AllowStopBackgroundActivity,
 
+    [switch]$IncludeWindowsUpdates,
+
+    [switch]$IncludeOptionalUpdates,
+
+    [switch]$IncludeDriverUpdates,
+
+    [switch]$IncludeFirmwareUpdates,
+
     [switch]$ConfirmReset,
 
     [switch]$ForceReset,
@@ -84,8 +92,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC7'
-        Version = '2.0.6.0'
+        PublicLabel = 'V2.0.0-RC8'
+        Version = '2.0.7.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -319,6 +327,83 @@ function Get-PcnAppUpdateCacheRoot {
     return $root
 }
 
+function Get-PcnPortableSourceExePath {
+    $sourceExe = [string]$env:PCNINJA_PORTABLE_SOURCE_EXE
+    if ([string]::IsNullOrWhiteSpace($sourceExe)) {
+        return $null
+    }
+
+    try {
+        $fullPath = [System.IO.Path]::GetFullPath($sourceExe)
+        if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+            return $fullPath
+        }
+    }
+    catch {
+        return $null
+    }
+
+    return $null
+}
+
+function Get-PcnPortableSourceDirectory {
+    $sourceExe = Get-PcnPortableSourceExePath
+    if ([string]::IsNullOrWhiteSpace($sourceExe)) {
+        return $null
+    }
+
+    $directory = [System.IO.Path]::GetDirectoryName($sourceExe)
+    if ([string]::IsNullOrWhiteSpace($directory)) {
+        return $null
+    }
+
+    if (Test-Path -LiteralPath $directory -PathType Container) {
+        return $directory
+    }
+
+    return $null
+}
+
+function Test-PcnPortableRuntime {
+    if ([string]$env:PCNINJA_PORTABLE_MODE -eq '1') {
+        return $true
+    }
+
+    return -not [string]::IsNullOrWhiteSpace((Get-PcnPortableSourceExePath))
+}
+
+function Get-PcnEffectiveAppUpdatePackageType {
+    param([string]$PackageType = 'Msi')
+
+    if (-not (Test-PcnCliParameter -Name 'UpdatePackageType') -and (Test-PcnPortableRuntime)) {
+        return 'Portable'
+    }
+
+    return $PackageType
+}
+
+function Get-PcnAppUpdateDownloadRoot {
+    param(
+        [ValidateSet('Msi', 'Portable')]
+        [string]$PackageType = 'Msi',
+
+        [string]$Path
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        return (Get-PcnAppUpdateCacheRoot -Path $Path)
+    }
+
+    if ($PackageType -eq 'Portable') {
+        $sourceDirectory = Get-PcnPortableSourceDirectory
+        if (-not [string]::IsNullOrWhiteSpace($sourceDirectory)) {
+            return $sourceDirectory
+        }
+    }
+
+    return (Get-PcnAppUpdateCacheRoot)
+}
+
 function Read-PcnAppUpdateManifest {
     param([string]$Source)
 
@@ -533,8 +618,35 @@ function Invoke-PcnAppUpdateDownload {
     $fileName = [string](Get-PcnObjectProperty -InputObject $package -Name 'fileName')
     $expectedHash = ([string](Get-PcnObjectProperty -InputObject $package -Name 'sha256')).ToUpperInvariant()
 
-    $cacheRoot = Get-PcnAppUpdateCacheRoot -Path $CachePath
+    $cacheRoot = Get-PcnAppUpdateDownloadRoot -PackageType $PackageType -Path $CachePath
     $targetPath = Join-Path $cacheRoot $fileName
+    if ($PackageType -eq 'Portable') {
+        $sourceExe = Get-PcnPortableSourceExePath
+        if (-not [string]::IsNullOrWhiteSpace($sourceExe)) {
+            try {
+                $targetFullPath = [System.IO.Path]::GetFullPath($targetPath)
+                $sourceFullPath = [System.IO.Path]::GetFullPath($sourceExe)
+                if ([string]::Equals($targetFullPath, $sourceFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $nameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
+                    $extension = [System.IO.Path]::GetExtension($fileName)
+                    $versionSuffix = [string]$check.LatestPublicLabel
+                    if ([string]::IsNullOrWhiteSpace($versionSuffix)) {
+                        $versionSuffix = [string]$check.LatestVersion
+                    }
+
+                    $versionSuffix = ($versionSuffix -replace '[^A-Za-z0-9._-]', '')
+                    if ([string]::IsNullOrWhiteSpace($versionSuffix)) {
+                        $versionSuffix = (Get-Date -Format 'yyyyMMddHHmmss')
+                    }
+
+                    $targetPath = Join-Path $cacheRoot ("{0}-{1}{2}" -f $nameWithoutExtension, $versionSuffix, $extension)
+                }
+            }
+            catch {
+                Write-PcnWinUpdateLog -Message "Portable update self-overwrite guard skipped: $($_.Exception.Message)" -EntryType Warning -EventID 1092
+            }
+        }
+    }
 
     Invoke-WebRequest -Uri $packageUrl -UseBasicParsing -OutFile $targetPath
     $actualHash = (Get-FileHash -LiteralPath $targetPath -Algorithm SHA256).Hash.ToUpperInvariant()
@@ -610,43 +722,94 @@ function Invoke-PcnAppUpdateInstall {
 }
 
 function Invoke-PcnUpdatePreviewScan {
+    param(
+        [switch]$UseExplicitUpdateScope,
+        [switch]$IncludeWindowsUpdates,
+        [switch]$IncludeOptionalUpdates,
+        [switch]$IncludeDriverUpdates,
+        [switch]$IncludeFirmwareUpdates
+    )
+
     Enable-PcnMicrosoftUpdate
     Test-PcnNetworkReadiness | Out-Null
     Initialize-PcnWindowsUpdateServices
 
     $session = New-Object -ComObject Microsoft.Update.Session
+    $session.ClientApplicationID = 'PcNinja WinUpdate Tool'
     $searcher = $session.CreateUpdateSearcher()
-    $result = $searcher.Search('IsInstalled=0 and IsHidden=0')
+
+    $scope = New-PcnUpdateScope `
+        -UseExplicitUpdateScope:$UseExplicitUpdateScope `
+        -IncludeWindowsUpdates:([bool]$IncludeWindowsUpdates) `
+        -IncludeOptionalUpdates:([bool]$IncludeOptionalUpdates) `
+        -IncludeDriverUpdates:([bool]$IncludeDriverUpdates) `
+        -IncludeFirmwareUpdates:([bool]$IncludeFirmwareUpdates)
+
+    $searchBuckets = @(
+        (Invoke-PcnUpdateSearchBucket -Searcher $searcher -Criteria 'IsInstalled=0 and IsHidden=0' -Source 'Broad' -Label 'V2 preview broad discovery'),
+        (Invoke-PcnUpdateSearchBucket -Searcher $searcher -Criteria "IsInstalled=0 and IsHidden=0 and Type='Driver'" -Source 'Driver' -Label 'V2 preview explicit driver discovery'),
+        (Invoke-PcnUpdateSearchBucket -Searcher $searcher -Criteria 'IsInstalled=0 and IsHidden=0 and BrowseOnly=1' -Source 'Optional' -Label 'V2 preview explicit optional discovery')
+    )
+
+    $usableBuckets = @($searchBuckets | Where-Object { $null -ne $_.Result })
+    if ($usableBuckets.Count -eq 0) {
+        $errors = @($searchBuckets | Where-Object { $_.Error } | Select-Object -ExpandProperty Error)
+        throw "Windows Update preview returned no usable results. $($errors -join ' | ')"
+    }
+
+    $mergedUpdates = Get-PcnMergedUpdateList -SearchBuckets $usableBuckets
 
     $important = 0
     $optional = 0
     $drivers = 0
+    $firmwareSkipped = 0
+    $firmwareIncluded = 0
+    $scopeSkipped = 0
+    $items = New-Object System.Collections.Generic.List[object]
 
-    for ($index = 0; $index -lt $result.Updates.Count; $index++) {
-        $update = $result.Updates.Item($index)
-        $typeName = Get-PcnUpdateTypeName -Update $update
-        $isDriver = ($typeName -eq 'Driver')
-        $isOptional = $false
+    foreach ($entry in $mergedUpdates) {
+        $update = $entry.Update
+        $scopeKind = Get-PcnUpdateScopeKind -Update $update
+        $isFirmware = Test-PcnFirmwareUpdate -Update $update
+        $included = $true
 
-        try {
-            $isOptional = [bool]$update.BrowseOnly
+        if ($isFirmware -and -not [bool]$scope.Firmware) {
+            $firmwareSkipped++
+            $included = $false
         }
-        catch {
-            $isOptional = $false
+        elseif (-not (Test-PcnUpdateIncludedByScope -Update $update -Scope $scope)) {
+            $scopeSkipped++
+            $included = $false
         }
 
-        if ($isDriver) {
-            $drivers++
+        if ($included) {
+            if ($isFirmware) {
+                $firmwareIncluded++
+                $drivers++
+            }
+            elseif ($scopeKind -eq 'Driver') {
+                $drivers++
+            }
+            elseif ($scopeKind -eq 'Optional') {
+                $optional++
+            }
+            else {
+                $important++
+            }
         }
-        elseif ($isOptional) {
-            $optional++
-        }
-        else {
-            $important++
-        }
+
+        $items.Add([pscustomobject]@{
+            Title = [string]$update.Title
+            Type = Get-PcnUpdateTypeName -Update $update
+            Scope = $scopeKind
+            Kb = Convert-PcnUpdateKbList -Update $update
+            Sources = @($entry.Sources)
+            Firmware = $isFirmware
+            Included = $included
+        }) | Out-Null
     }
 
-    Write-PcnWinUpdateLog -Message "V2 preview scan complete. Important: $important, Optional: $optional, Drivers: $drivers." -EventID 1082
+    Write-PcnWinUpdateLog -Message "V2 available update check complete. Scope: $(Get-PcnUpdateScopeSummary -Scope $scope). Important: $important, Optional: $optional, Drivers: $drivers, Firmware skipped: $firmwareSkipped, Scope skipped: $scopeSkipped." -EventID 1082
 
     [pscustomobject]@{
         Result = 'Succeeded'
@@ -655,7 +818,13 @@ function Invoke-PcnUpdatePreviewScan {
         Important = $important
         Optional = $optional
         Drivers = $drivers
-        Total = [int]$result.Updates.Count
+        FirmwareSkipped = $firmwareSkipped
+        FirmwareIncluded = $firmwareIncluded
+        ScopeSkipped = $scopeSkipped
+        Total = ($important + $optional + $drivers)
+        TotalDiscovered = [int]$mergedUpdates.Count
+        Scope = $scope
+        Items = @($items)
         Timestamp = (Get-Date).ToString('s')
     }
 }
@@ -1248,7 +1417,8 @@ if ($Mode -eq 'Status') {
 
 if ($Mode -eq 'AppUpdateCheck') {
     try {
-        Write-PcnCliObject -InputObject (Invoke-PcnAppUpdateCheck -ManifestSource $ManifestUrl -PackageType $UpdatePackageType) -Depth 12
+        $effectivePackageType = Get-PcnEffectiveAppUpdatePackageType -PackageType $UpdatePackageType
+        Write-PcnCliObject -InputObject (Invoke-PcnAppUpdateCheck -ManifestSource $ManifestUrl -PackageType $effectivePackageType) -Depth 12
         exit 0
     }
     catch {
@@ -1258,7 +1428,8 @@ if ($Mode -eq 'AppUpdateCheck') {
 
 if ($Mode -eq 'AppUpdateDownload') {
     try {
-        $downloadResult = Invoke-PcnAppUpdateDownload -ManifestSource $ManifestUrl -PackageType $UpdatePackageType -CachePath $UpdateCachePath
+        $effectivePackageType = Get-PcnEffectiveAppUpdatePackageType -PackageType $UpdatePackageType
+        $downloadResult = Invoke-PcnAppUpdateDownload -ManifestSource $ManifestUrl -PackageType $effectivePackageType -CachePath $UpdateCachePath
         Write-PcnCliObject -InputObject $downloadResult -Depth 12
         if ($downloadResult.Success) {
             exit 0
@@ -1310,7 +1481,16 @@ if (-not (Test-PcnAdministrator)) {
 
 if ($Mode -eq 'PreviewUpdates') {
     try {
-        Write-PcnCliObject -InputObject (Invoke-PcnUpdatePreviewScan) -Depth 8
+        $useExplicitUpdateScope = (Test-PcnCliParameter -Name 'IncludeWindowsUpdates') -or
+            (Test-PcnCliParameter -Name 'IncludeOptionalUpdates') -or
+            (Test-PcnCliParameter -Name 'IncludeDriverUpdates') -or
+            (Test-PcnCliParameter -Name 'IncludeFirmwareUpdates')
+        Write-PcnCliObject -InputObject (Invoke-PcnUpdatePreviewScan `
+            -UseExplicitUpdateScope:$useExplicitUpdateScope `
+            -IncludeWindowsUpdates:$IncludeWindowsUpdates `
+            -IncludeOptionalUpdates:$IncludeOptionalUpdates `
+            -IncludeDriverUpdates:$IncludeDriverUpdates `
+            -IncludeFirmwareUpdates:$IncludeFirmwareUpdates) -Depth 10
         exit 0
     }
     catch {
@@ -1357,7 +1537,21 @@ if ($Mode -eq 'RunUpdates') {
     try {
         $config = Get-PcnWinUpdateConfig
         $showPrompt = (-not $Silent) -and [bool]$config.ShowRebootPrompt
-        $result = Invoke-PcnManagedWindowsUpdateRun -RunType $RunType -ScriptPath $PSCommandPath -Silent:$Silent -ShowRebootPrompt:$showPrompt -AllowStopBackgroundActivity:$AllowStopBackgroundActivity
+        $useExplicitUpdateScope = (Test-PcnCliParameter -Name 'IncludeWindowsUpdates') -or
+            (Test-PcnCliParameter -Name 'IncludeOptionalUpdates') -or
+            (Test-PcnCliParameter -Name 'IncludeDriverUpdates') -or
+            (Test-PcnCliParameter -Name 'IncludeFirmwareUpdates')
+        $result = Invoke-PcnManagedWindowsUpdateRun `
+            -RunType $RunType `
+            -ScriptPath $PSCommandPath `
+            -Silent:$Silent `
+            -ShowRebootPrompt:$showPrompt `
+            -AllowStopBackgroundActivity:$AllowStopBackgroundActivity `
+            -UseExplicitUpdateScope:$useExplicitUpdateScope `
+            -IncludeWindowsUpdates:$IncludeWindowsUpdates `
+            -IncludeOptionalUpdates:$IncludeOptionalUpdates `
+            -IncludeDriverUpdates:$IncludeDriverUpdates `
+            -IncludeFirmwareUpdates:$IncludeFirmwareUpdates
 
         if ($Json) {
             Write-PcnCliObject -InputObject $result -Depth 8

@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.6.0'
+    $Version = '2.0.7.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC7'
+    $PublicLabel = 'V2.0.0-RC8'
 }
 
 if (-not $Repository) {
@@ -451,7 +451,7 @@ Write-ExampleFile -Name 'Portable-CLI-Examples.cmd' -Lines @(
     '"%PORTABLE%" -Mode Configure -EnableSchedule -Frequency Monthly -MonthlyDay 15 -Time 03:00 -RunAtStartup -StartupDelayMinutes 5 -RunIfMissed -WakeToRun -RetryInitialDelayMinutes 5 -MinimumCooldownMinutes 5 -Json',
     '"%PORTABLE%" -Mode ResetWindowsUpdate -ConfirmReset -Json',
     '"%PORTABLE%" -Mode AppUpdateCheck -Json',
-    '"%PORTABLE%" -Mode AppUpdateDownload -Json',
+    '"%PORTABLE%" -Mode AppUpdateDownload -UpdatePackageType Portable -Json',
     'exit /b %ERRORLEVEL%'
 )
 
@@ -478,6 +478,7 @@ Write-ExampleFile -Name 'README-Deployment-Examples.txt' -Lines @(
     '  AppUpdateCheck reads update-manifest.json and reports whether a newer release exists.',
     '  AppUpdateDownload downloads and verifies the selected release package.',
     '  AppUpdateInstall is user-initiated and is intended for installed MSI deployments.',
+    '  Portable EXE update downloads use the versioned portable file name from the manifest.',
     '',
     'CMD line-continuation rule:',
     '  The ^ character is only for CMD/BAT line continuation.',
@@ -561,6 +562,9 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Fixes V2 UI manual run, Snooz run, reset, and schedule actions to launch WinUpdateTool.ps1.',
     '- Simplifies V2 navigation: Settings owns schedule, app update stays in the sidebar, and duplicate quick actions were removed.',
     '- Adds non-blocking V2 preview scan and live-follow log refresh.',
+    '- Restores the V1-style manual update workflow with Windows, optional, driver, and firmware scopes.',
+    '- Restores restart handling, Windows Update reset access, and Snooz only when Windows Update is actually busy.',
+    '- Adds portable EXE app updates that download the next versioned EXE beside the running portable file.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',
@@ -596,6 +600,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir 'PUBLIC-RELEASE-README.txt
     "  $publicPortableFileName /?",
     "  $publicPortableFileName -Mode Status -Json",
     "  $publicPortableFileName -Mode AppUpdateCheck -Json",
+    "  $publicPortableFileName -Mode AppUpdateDownload -UpdatePackageType Portable -Json",
     '',
     "Signing status: $signingStatus"
 )

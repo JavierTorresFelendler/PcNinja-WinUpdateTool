@@ -9,13 +9,13 @@ using System.Text;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.0.6.0")]
-[assembly: AssemblyFileVersion("2.0.6.0")]
-[assembly: AssemblyInformationalVersion("V2.0.0-RC7")]
+[assembly: AssemblyVersion("2.0.7.0")]
+[assembly: AssemblyFileVersion("2.0.7.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC8")]
 
 internal static class WinUpdateToolCli
 {
-    private const string Version = "V2.0.0-RC7";
+    private const string Version = "V2.0.0-RC8";
 
     private static int Main(string[] args)
     {
@@ -147,11 +147,14 @@ internal static class WinUpdateToolCli
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Status -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode DriverAudit -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode PreviewUpdates -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode PreviewUpdates -IncludeWindowsUpdates -IncludeOptionalUpdates -IncludeDriverUpdates -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode CollectLogs -OutputPath C:\\Temp -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode RunUpdates -Silent -RunType Manual -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode RunUpdates -Silent -RunType Manual -IncludeWindowsUpdates -IncludeDriverUpdates -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode ResetWindowsUpdate -ConfirmReset -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateCheck -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateDownload -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode AppUpdateInstall -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Configure -EnableSchedule -Frequency Monthly -MonthlyDay 15 -Time 03:00 -WakeToRun");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Configure -ConfigFile C:\\Temp\\pcninja-install.json -Json");
@@ -171,6 +174,7 @@ internal static class WinUpdateToolCli
         Console.WriteLine("  -ManifestUrl <url-or-local-json-path>");
         Console.WriteLine("  -UpdatePackageType Msi|Portable");
         Console.WriteLine("  -UpdateCachePath <folder>");
+        Console.WriteLine("  -IncludeWindowsUpdates | -IncludeOptionalUpdates | -IncludeDriverUpdates | -IncludeFirmwareUpdates");
         Console.WriteLine();
         Console.WriteLine("Schedule options:");
         Console.WriteLine("  -EnableSchedule | -DisableSchedule");

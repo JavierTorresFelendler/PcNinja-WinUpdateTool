@@ -1,4 +1,4 @@
-﻿PcNinja WinUpdate Tool V2.0.0-RC7 Release Notes
+﻿PcNinja WinUpdate Tool V2.0.0-RC8 Release Notes
 
 Release candidate for V2.0.0.
 
@@ -9,6 +9,9 @@ Highlights:
 - Fixes V2 UI manual run, Snooz run, reset, and schedule actions to launch WinUpdateTool.ps1.
 - Simplifies V2 navigation: Settings owns schedule, app update stays in the sidebar, and duplicate quick actions were removed.
 - Adds non-blocking V2 preview scan and live-follow log refresh.
+- Restores the V1-style manual update workflow with Windows, optional, driver, and firmware scopes.
+- Restores restart handling, Windows Update reset access, and Snooz only when Windows Update is actually busy.
+- Adds portable EXE app updates that download the next versioned EXE beside the running portable file.
 - Keeps Windows Update engine behavior based on V1.1.2.
 
 Notes:

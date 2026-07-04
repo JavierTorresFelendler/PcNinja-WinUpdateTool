@@ -11,13 +11,13 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.0.6.0")]
-[assembly: AssemblyFileVersion("2.0.6.0")]
-[assembly: AssemblyInformationalVersion("V2.0.0-RC7")]
+[assembly: AssemblyVersion("2.0.7.0")]
+[assembly: AssemblyFileVersion("2.0.7.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC8")]
 
 internal static class PortableLauncher
 {
-    private const string Version = "2.0.6.0";
+    private const string Version = "2.0.7.0";
     private const string PayloadResourceName = "PcNinjaPortablePayload";
 
     [STAThread]
@@ -135,7 +135,8 @@ internal static class PortableLauncher
         ProcessStartInfo startInfo = new ProcessStartInfo();
         startInfo.FileName = hostExe;
         startInfo.WorkingDirectory = extractRoot;
-        startInfo.UseShellExecute = true;
+        startInfo.UseShellExecute = false;
+        AddPortableEnvironment(startInfo);
         Process.Start(startInfo);
     }
 
@@ -152,6 +153,7 @@ internal static class PortableLauncher
         startInfo.Arguments = JoinArguments(args);
         startInfo.WorkingDirectory = extractRoot;
         startInfo.UseShellExecute = false;
+        AddPortableEnvironment(startInfo);
 
         using (Process process = Process.Start(startInfo))
         {
@@ -175,6 +177,17 @@ internal static class PortableLauncher
         }
 
         return false;
+    }
+
+    private static void AddPortableEnvironment(ProcessStartInfo startInfo)
+    {
+        startInfo.EnvironmentVariables["PCNINJA_PORTABLE_MODE"] = "1";
+        startInfo.EnvironmentVariables["PCNINJA_PORTABLE_SOURCE_EXE"] = Application.ExecutablePath;
+        string sourceDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+        if (!String.IsNullOrWhiteSpace(sourceDirectory))
+        {
+            startInfo.EnvironmentVariables["PCNINJA_PORTABLE_SOURCE_DIR"] = sourceDirectory;
+        }
     }
 
     private static void WriteHelp()
@@ -231,7 +244,7 @@ internal static class PortableLauncher
         string executableName = Path.GetFileName(Application.ExecutablePath);
         if (String.IsNullOrWhiteSpace(executableName))
         {
-            executableName = "PcNinja-WinUpdateTool-V2.0.0-RC7-Portable.exe";
+            executableName = "PcNinja-WinUpdateTool-V2.0.0-RC8-Portable.exe";
         }
 
         StringBuilder builder = new StringBuilder();
@@ -247,6 +260,7 @@ internal static class PortableLauncher
         builder.AppendFormat("  {0} -Mode ResetWindowsUpdate -ConfirmReset -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode AppUpdateCheck -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode AppUpdateDownload -Json\r\n", executableName);
+        builder.AppendFormat("  {0} -Mode AppUpdateDownload -UpdatePackageType Portable -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode Configure -ConfigFile C:\\Temp\\pcninja-install.json -Json\r\n", executableName);
         builder.AppendLine();
         builder.AppendLine("Portable extraction path:");

@@ -256,6 +256,47 @@ function Show-PcnWinUpdateV2Ui {
         return $downloads
     }
 
+    function Get-V2AppUpdatePackageType {
+        if ([string]$env:PCNINJA_PORTABLE_MODE -eq '1' -or -not [string]::IsNullOrWhiteSpace([string]$env:PCNINJA_PORTABLE_SOURCE_EXE)) {
+            return 'Portable'
+        }
+
+        return 'Msi'
+    }
+
+    function Get-V2PortableSourceFolder {
+        $sourceExe = [string]$env:PCNINJA_PORTABLE_SOURCE_EXE
+        if ([string]::IsNullOrWhiteSpace($sourceExe)) {
+            return $null
+        }
+
+        try {
+            $sourcePath = [System.IO.Path]::GetFullPath($sourceExe)
+            $sourceFolder = [System.IO.Path]::GetDirectoryName($sourcePath)
+            if (-not [string]::IsNullOrWhiteSpace($sourceFolder) -and (Test-Path -LiteralPath $sourceFolder -PathType Container)) {
+                return $sourceFolder
+            }
+        }
+        catch {
+            return $null
+        }
+
+        return $null
+    }
+
+    function Get-V2AppUpdateDownloadFolder {
+        param([ValidateSet('Msi', 'Portable')][string]$PackageType = 'Msi')
+
+        if ($PackageType -eq 'Portable') {
+            $portableFolder = Get-V2PortableSourceFolder
+            if (-not [string]::IsNullOrWhiteSpace($portableFolder)) {
+                return $portableFolder
+            }
+        }
+
+        return (Get-V2DownloadsFolder)
+    }
+
     function Format-V2Date {
         param([object]$Value)
 
@@ -357,6 +398,8 @@ function Show-PcnWinUpdateV2Ui {
             Status = 'NotChecked'
             Message = 'Ready to check GitHub Releases.'
         }
+        $packageType = Get-V2AppUpdatePackageType
+        $packageLabel = if ($packageType -eq 'Portable') { 'portable EXE' } else { 'MSI' }
 
         $title = New-V2Label -Text 'PcNinja Tool Update' -X 24 -Y 18 -Width 420 -Height 30 -Font $fontHero
         $dialog.Controls.Add($title)
@@ -400,7 +443,7 @@ function Show-PcnWinUpdateV2Ui {
 
         $info = New-V2Card -X 24 -Y 328 -Width 712 -Height 62 -Title ''
         $info.Controls.Add((New-V2Label -Text ([string][char]0xE946) -X 22 -Y 12 -Width 38 -Height 38 -Font (New-Object System.Drawing.Font('Segoe MDL2 Assets', 24)) -ForeColor $colors.Blue2 -Align 'MiddleCenter'))
-        $infoText = New-V2Label -Text 'V2 downloads directly from GitHub Releases, verifies SHA256, and then hands off to MSI.' -X 72 -Y 12 -Width 610 -Height 38
+        $infoText = New-V2Label -Text "V2 downloads the $packageLabel directly from GitHub Releases and verifies SHA256." -X 72 -Y 12 -Width 610 -Height 38
         $info.Controls.Add($infoText)
         $dialog.Controls.Add($info)
 
@@ -410,8 +453,9 @@ function Show-PcnWinUpdateV2Ui {
         $dialog.Controls.Add($safety)
 
         $checkButton = New-V2Button -Text 'Check Again' -X 24 -Y 466 -Width 128 -Height 32
-        $downloadButton = New-V2Button -Text 'Download Verified' -X 164 -Y 466 -Width 164 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(13, 36, 58))
+        $downloadButton = New-V2Button -Text $(if ($packageType -eq 'Portable') { 'Download EXE' } else { 'Download Verified' }) -X 164 -Y 466 -Width 164 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(13, 36, 58))
         $installButton = New-V2Button -Text 'Install MSI' -X 340 -Y 466 -Width 118 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 67)) -BorderColor $colors.Purple
+        $installButton.Visible = ($packageType -eq 'Msi')
         $releaseButton = New-V2Button -Text 'Open Release Page' -X 470 -Y 466 -Width 154 -Height 32
         $closeDialogButton = New-V2Button -Text 'Close' -X 636 -Y 466 -Width 100 -Height 32 -BorderColor $colors.Border
         $dialog.Controls.AddRange([System.Windows.Forms.Control[]]@($checkButton, $downloadButton, $installButton, $releaseButton, $closeDialogButton))
@@ -456,7 +500,7 @@ function Show-PcnWinUpdateV2Ui {
             try {
                 $summary.Text = 'Checking GitHub Releases manifest...'
                 $dialog.Refresh()
-                $check = Invoke-PcnAppUpdateCheck -PackageType 'Msi'
+                $check = Invoke-PcnAppUpdateCheck -PackageType $packageType
                 Update-DialogFromCheck -CheckResult $check
             }
             catch {
@@ -476,17 +520,17 @@ function Show-PcnWinUpdateV2Ui {
 
         $downloadButton.Add_Click({
             try {
-                $target = Get-V2DownloadsFolder
-                $summary.Text = "Downloading verified MSI to:`r`n$target"
+                $target = Get-V2AppUpdateDownloadFolder -PackageType $packageType
+                $summary.Text = "Downloading verified $packageLabel to:`r`n$target"
                 $dialog.Refresh()
-                $download = Invoke-PcnAppUpdateDownload -PackageType 'Msi' -CachePath $target
+                $download = Invoke-PcnAppUpdateDownload -PackageType $packageType -CachePath $target
                 if ($download.Success -and $download.FilePath) {
                     $shaValue.Text = 'Verified'
                     $shaValue.ForeColor = $colors.Green
                     [System.Windows.Forms.MessageBox]::Show("Downloaded and verified:`r`n$($download.FilePath)", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
                 }
                 elseif ($download.Result -eq 'NoNewerVersion') {
-                    [System.Windows.Forms.MessageBox]::Show('No newer MSI is available from the manifest.', 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                    [System.Windows.Forms.MessageBox]::Show("No newer $packageLabel is available from the manifest.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
                 }
                 else {
                     [System.Windows.Forms.MessageBox]::Show("Download did not complete: $($download.Result)", 'PcNinja Tool Update', 'OK', 'Warning') | Out-Null
@@ -721,6 +765,8 @@ function Show-PcnWinUpdateV2Ui {
         ScanProcess = $null
         ScanOutPath = $null
         ScanErrPath = $null
+        LastPreviewItems = @()
+        PendingReboot = $null
     }
 
     $smokeTimer = New-Object System.Windows.Forms.Timer
@@ -765,34 +811,51 @@ function Show-PcnWinUpdateV2Ui {
     $healthCard.Controls.AddRange([System.Windows.Forms.Control[]]@($healthText, $healthSub))
     $dashboard.Controls.Add($healthCard)
 
+    $repairCard = New-V2Card -X 0 -Y 376 -Width 870 -Height 112 -Title 'Repair Windows Update'
+    $repairCard.Controls.Add((New-V2Label -Text 'Use this only when Windows Update appears stuck scanning, downloading, or installing.' -X 20 -Y 44 -Width 560 -Height 24 -ForeColor $colors.Muted))
+    $dashboardResetButton = New-V2Button -Text 'Reset Windows Update' -X 640 -Y 42 -Width 190 -Height 36 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
+    $repairCard.Controls.Add($dashboardResetButton)
+    $dashboard.Controls.Add($repairCard)
+
     $updates = $pages['Updates']
-    $manualCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 130 -Title 'Manual Windows Updates'
-    $manualCard.Controls.Add((New-V2Label -Text 'Scan Windows Update and Microsoft Update for your system.' -X 20 -Y 40 -Width 520 -Height 24 -ForeColor $colors.Muted))
-    $scanButton = New-V2Button -Text 'Scan' -X 20 -Y 76 -Width 220 -Height 38 -BackColor ([System.Drawing.Color]::FromArgb(12, 74, 142))
-    $runUpdatesButton = New-V2Button -Text 'Run Updates' -X 255 -Y 76 -Width 220 -Height 38 -BackColor ([System.Drawing.Color]::FromArgb(12, 74, 142))
-    $snoozButton = New-V2Button -Text 'Snooz to run' -X 490 -Y 76 -Width 220 -Height 38 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
-    $manualCard.Controls.AddRange([System.Windows.Forms.Control[]]@($scanButton, $runUpdatesButton, $snoozButton))
+    $manualCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 190 -Title 'Windows Update Run'
+    $manualCard.Controls.Add((New-V2Label -Text 'Choose what PcNinja should check and install from Windows Update.' -X 20 -Y 40 -Width 610 -Height 24 -ForeColor $colors.Muted))
+    $windowsUpdatesCheck = New-V2CheckBox -Text 'Windows updates' -X 24 -Y 72 -Checked $true
+    $optionalUpdatesCheck = New-V2CheckBox -Text 'Optional updates' -X 270 -Y 72 -Checked $true
+    $driverUpdatesCheck = New-V2CheckBox -Text 'Driver updates' -X 516 -Y 72 -Checked $true
+    $firmwareUpdatesCheck = New-V2CheckBox -Text 'Firmware / BIOS updates' -X 24 -Y 112 -Checked $false
+    $manualCard.Controls.AddRange([System.Windows.Forms.Control[]]@($windowsUpdatesCheck, $optionalUpdatesCheck, $driverUpdatesCheck, $firmwareUpdatesCheck))
+    $manualCard.Controls.Add((New-V2Label -Text 'Security, cumulative, .NET, servicing' -X 48 -Y 96 -Width 210 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
+    $manualCard.Controls.Add((New-V2Label -Text 'Browse-only optional packages' -X 294 -Y 96 -Width 190 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
+    $manualCard.Controls.Add((New-V2Label -Text 'Windows Update driver catalog' -X 540 -Y 96 -Width 210 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
+    $manualCard.Controls.Add((New-V2Label -Text 'Explicit opt-in only' -X 48 -Y 136 -Width 180 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
+    $checkAvailableButton = New-V2Button -Text 'Check Available Updates' -X 394 -Y 136 -Width 210 -Height 38 -BackColor ([System.Drawing.Color]::FromArgb(12, 74, 142))
+    $installSelectedButton = New-V2Button -Text 'Install Selected Updates' -X 620 -Y 136 -Width 220 -Height 38 -BackColor $colors.Blue
+    $manualCard.Controls.AddRange([System.Windows.Forms.Control[]]@($checkAvailableButton, $installSelectedButton))
     $updates.Controls.Add($manualCard)
 
-    $candidateCard = New-V2Card -X 0 -Y 146 -Width 870 -Height 100 -Title 'Candidate Preview'
-    $candidateCard.Controls.Add((New-V2Label -Text 'Preview important updates that are available.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted))
-    $previewButton = New-V2Button -Text 'Preview Updates' -X 20 -Y 64 -Width 150 -Height 28
-    $importantCount = New-V2Label -Text '-' -X 480 -Y 42 -Width 60 -Height 32 -Font $fontHero -ForeColor $colors.Orange -Align 'MiddleCenter'
-    $optionalCount = New-V2Label -Text '-' -X 610 -Y 42 -Width 60 -Height 32 -Font $fontHero -ForeColor $colors.Blue2 -Align 'MiddleCenter'
-    $driversCount = New-V2Label -Text '-' -X 740 -Y 42 -Width 60 -Height 32 -Font $fontHero -ForeColor $colors.Green -Align 'MiddleCenter'
-    $candidateCard.Controls.AddRange([System.Windows.Forms.Control[]]@($previewButton, $importantCount, $optionalCount, $driversCount))
-    $candidateCard.Controls.Add((New-V2Label -Text 'Important' -X 468 -Y 72 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
-    $candidateCard.Controls.Add((New-V2Label -Text 'Optional' -X 600 -Y 72 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
-    $candidateCard.Controls.Add((New-V2Label -Text 'Drivers' -X 728 -Y 72 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
-    $updates.Controls.Add($candidateCard)
+    $availableCard = New-V2Card -X 0 -Y 206 -Width 870 -Height 120 -Title 'Available Updates'
+    $availableSummary = New-V2Label -Text 'No check has run yet.' -X 20 -Y 48 -Width 360 -Height 44 -ForeColor $colors.Muted
+    $viewUpdateListButton = New-V2Button -Text 'View List' -X 20 -Y 82 -Width 120 -Height 28 -BorderColor $colors.Border
+    $importantCount = New-V2Label -Text '-' -X 455 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Orange -Align 'MiddleCenter'
+    $optionalCount = New-V2Label -Text '-' -X 560 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Blue2 -Align 'MiddleCenter'
+    $driversCount = New-V2Label -Text '-' -X 665 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Green -Align 'MiddleCenter'
+    $firmwareSkippedCount = New-V2Label -Text '-' -X 770 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Purple -Align 'MiddleCenter'
+    $availableCard.Controls.AddRange([System.Windows.Forms.Control[]]@($availableSummary, $viewUpdateListButton, $importantCount, $optionalCount, $driversCount, $firmwareSkippedCount))
+    $availableCard.Controls.Add((New-V2Label -Text 'Important' -X 442 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
+    $availableCard.Controls.Add((New-V2Label -Text 'Optional' -X 548 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
+    $availableCard.Controls.Add((New-V2Label -Text 'Drivers' -X 653 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
+    $availableCard.Controls.Add((New-V2Label -Text 'Firmware skipped' -X 744 -Y 78 -Width 120 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
+    $updates.Controls.Add($availableCard)
 
-    $restartCard = New-V2Card -X 0 -Y 262 -Width 870 -Height 90 -Title 'Restart State'
-    $restartLabel = New-V2Label -Text 'Checking restart state...' -X 20 -Y 48 -Width 500 -Height 24 -ForeColor $colors.Muted
+    $restartCard = New-V2Card -X 0 -Y 342 -Width 870 -Height 90 -Title 'Restart State'
+    $restartLabel = New-V2Label -Text 'Checking restart state...' -X 20 -Y 48 -Width 570 -Height 24 -ForeColor $colors.Muted
+    $restartNowButton = New-V2Button -Text 'Restart Now' -X 610 -Y 42 -Width 112 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 18)) -BorderColor $colors.Orange -ForeColor $colors.Orange
     $restartDetailsButton = New-V2Button -Text 'Details' -X 735 -Y 42 -Width 100 -Height 32 -BorderColor $colors.Border
-    $restartCard.Controls.AddRange([System.Windows.Forms.Control[]]@($restartLabel, $restartDetailsButton))
+    $restartCard.Controls.AddRange([System.Windows.Forms.Control[]]@($restartLabel, $restartNowButton, $restartDetailsButton))
     $updates.Controls.Add($restartCard)
 
-    $linksCard = New-V2Card -X 0 -Y 368 -Width 870 -Height 100 -Title 'Helpful Links'
+    $linksCard = New-V2Card -X 0 -Y 448 -Width 870 -Height 95 -Title 'Helpful Links'
     $linksCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 20 -Y 54 -Width 260))
     $linksCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Classes' -Url 'https://class.pcninja.pro' -X 430 -Y 54 -Width 220))
     $updates.Controls.Add($linksCard)
@@ -952,15 +1015,24 @@ function Show-PcnWinUpdateV2Ui {
             $lastInstallValue.Text = $lastInstall
 
             $pendingReboot = Test-PcnPendingReboot
-            if ($pendingReboot) {
+            $uiState.PendingReboot = $pendingReboot
+            if ([bool]$pendingReboot.Pending) {
+                $reasonText = if (@($pendingReboot.Reasons).Count -gt 0) { @($pendingReboot.Reasons)[0] } else { 'Windows reports that a restart is pending.' }
                 $rebootValue.Text = 'Required'
                 $rebootValue.ForeColor = $colors.Orange
-                $restartLabel.Text = 'Restart required after the last update operation.'
+                $restartLabel.Text = "Restart required: $reasonText"
+                $restartNowButton.Enabled = $true
             }
             else {
                 $rebootValue.Text = 'Not required'
                 $rebootValue.ForeColor = $colors.Green
-                $restartLabel.Text = 'Not required'
+                if ($pendingReboot.PSObject.Properties['Warnings'] -and @($pendingReboot.Warnings).Count -gt 0) {
+                    $restartLabel.Text = 'Not required. Non-blocking rename warnings were detected.'
+                }
+                else {
+                    $restartLabel.Text = 'Not required'
+                }
+                $restartNowButton.Enabled = $false
             }
 
             if ([bool]$config.Enabled) {
@@ -1062,15 +1134,260 @@ function Show-PcnWinUpdateV2Ui {
         }
     }
 
+    function Get-V2UpdateScopeArguments {
+        $parts = New-Object System.Collections.Generic.List[string]
+
+        if ([bool]$windowsUpdatesCheck.Checked) {
+            $parts.Add('-IncludeWindowsUpdates') | Out-Null
+        }
+
+        if ([bool]$optionalUpdatesCheck.Checked) {
+            $parts.Add('-IncludeOptionalUpdates') | Out-Null
+        }
+
+        if ([bool]$driverUpdatesCheck.Checked) {
+            $parts.Add('-IncludeDriverUpdates') | Out-Null
+        }
+
+        if ([bool]$firmwareUpdatesCheck.Checked) {
+            $parts.Add('-IncludeFirmwareUpdates') | Out-Null
+        }
+
+        if ($parts.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show('Select at least one update scope before checking or installing.', 'Update Scope', 'OK', 'Information') | Out-Null
+            return $null
+        }
+
+        return ($parts -join ' ')
+    }
+
+    function Format-V2PendingRebootDetails {
+        param([object]$PendingState)
+
+        if (-not $PendingState) {
+            return 'Restart state has not been checked yet.'
+        }
+
+        $lines = New-Object System.Collections.Generic.List[string]
+        $lines.Add("Pending: $([bool]$PendingState.Pending)") | Out-Null
+
+        if (@($PendingState.Reasons).Count -gt 0) {
+            $lines.Add('') | Out-Null
+            $lines.Add('Reasons:') | Out-Null
+            foreach ($reason in @($PendingState.Reasons)) {
+                $lines.Add("  - $reason") | Out-Null
+            }
+        }
+
+        if ($PendingState.PSObject.Properties['Warnings'] -and @($PendingState.Warnings).Count -gt 0) {
+            $lines.Add('') | Out-Null
+            $lines.Add('Warnings:') | Out-Null
+            foreach ($warning in @($PendingState.Warnings)) {
+                $lines.Add("  - $warning") | Out-Null
+            }
+        }
+
+        if ($PendingState.PSObject.Properties['BlockingFileRenameOperations'] -and @($PendingState.BlockingFileRenameOperations).Count -gt 0) {
+            $lines.Add('') | Out-Null
+            $lines.Add('Blocking file rename operations:') | Out-Null
+            foreach ($operation in @($PendingState.BlockingFileRenameOperations | Select-Object -First 8)) {
+                $lines.Add("  - $($operation.Source) -> $($operation.Destination)") | Out-Null
+            }
+        }
+
+        return ($lines -join "`r`n")
+    }
+
+    function Show-V2RestartRequiredDialog {
+        param([ValidateSet('Check', 'Install')][string]$ActionName = 'Check')
+
+        $dialog = New-Object System.Windows.Forms.Form
+        $dialog.Text = 'Restart Required'
+        $dialog.StartPosition = 'CenterParent'
+        $dialog.FormBorderStyle = 'FixedDialog'
+        $dialog.MinimizeBox = $false
+        $dialog.MaximizeBox = $false
+        $dialog.ShowInTaskbar = $false
+        $dialog.ClientSize = New-V2Size 650 260
+        $dialog.BackColor = $colors.CardBack
+        $dialog.ForeColor = $colors.Text
+        $dialog.Font = $fontBase
+        $dialog.Tag = 'Cancel'
+        if ($form.Icon) {
+            $dialog.Icon = $form.Icon
+        }
+
+        $dialog.Controls.Add((New-V2Label -Text 'Windows restart is pending' -X 24 -Y 22 -Width 590 -Height 32 -Font $fontHero))
+        $dialog.Controls.Add((New-V2Label -Text 'Windows reports that a restart is required. You can restart now, cancel, or ignore this once and continue the requested action.' -X 24 -Y 68 -Width 590 -Height 54 -ForeColor $colors.Muted))
+
+        $detailsBox = New-Object System.Windows.Forms.TextBox
+        $detailsBox.Multiline = $true
+        $detailsBox.ReadOnly = $true
+        $detailsBox.BorderStyle = 'FixedSingle'
+        $detailsBox.BackColor = $colors.Input
+        $detailsBox.ForeColor = $colors.Text
+        $detailsBox.Font = $fontSmall
+        $detailsBox.Location = New-V2Point 24 126
+        $detailsBox.Size = New-V2Size 590 58
+        $detailsBox.Text = Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot
+        $dialog.Controls.Add($detailsBox)
+
+        $restartChoice = New-V2Button -Text 'Restart Now' -X 190 -Y 204 -Width 120 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 18)) -BorderColor $colors.Orange -ForeColor $colors.Orange
+        $ignoreText = if ($ActionName -eq 'Install') { 'Ignore and install' } else { 'Ignore and check' }
+        $ignoreChoice = New-V2Button -Text $ignoreText -X 324 -Y 204 -Width 150 -Height 34
+        $cancelChoice = New-V2Button -Text 'Cancel' -X 488 -Y 204 -Width 90 -Height 34 -BorderColor $colors.Border
+        $restartChoice.Add_Click({ $dialog.Tag = 'Restart'; $dialog.Close() })
+        $ignoreChoice.Add_Click({ $dialog.Tag = 'Ignore'; $dialog.Close() })
+        $cancelChoice.Add_Click({ $dialog.Tag = 'Cancel'; $dialog.Close() })
+        $dialog.Controls.AddRange([System.Windows.Forms.Control[]]@($restartChoice, $ignoreChoice, $cancelChoice))
+        $dialog.CancelButton = $cancelChoice
+
+        $dialog.ShowDialog($form) | Out-Null
+        return [string]$dialog.Tag
+    }
+
+    function Confirm-V2RestartGate {
+        param([ValidateSet('Check', 'Install')][string]$ActionName = 'Check')
+
+        try {
+            $pending = Test-PcnPendingReboot
+            $uiState.PendingReboot = $pending
+            if (-not [bool]$pending.Pending) {
+                return $true
+            }
+
+            $choice = Show-V2RestartRequiredDialog -ActionName $ActionName
+            if ($choice -eq 'Restart') {
+                Restart-PcnComputerNow
+                return $false
+            }
+
+            if ($choice -eq 'Ignore') {
+                Write-PcnWinUpdateLog -Message "User ignored pending restart for V2 $ActionName action. Reasons: $(@($pending.Reasons) -join '; ')" -EntryType Warning -EventID 1095
+                return $true
+            }
+
+            $footerLabel.Text = "$ActionName cancelled because restart is pending."
+            return $false
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Restart Required', 'OK', 'Warning') | Out-Null
+            return $false
+        }
+    }
+
+    function Show-V2WindowsUpdateSnoozeDialog {
+        param([string]$ActivityMessage = 'Windows Update or Windows servicing is active.')
+
+        $dialog = New-Object System.Windows.Forms.Form
+        $dialog.Text = 'Windows Update Is Active'
+        $dialog.StartPosition = 'CenterParent'
+        $dialog.FormBorderStyle = 'FixedDialog'
+        $dialog.MinimizeBox = $false
+        $dialog.MaximizeBox = $false
+        $dialog.ShowInTaskbar = $false
+        $dialog.ClientSize = New-V2Size 640 250
+        $dialog.BackColor = $colors.CardBack
+        $dialog.ForeColor = $colors.Text
+        $dialog.Font = $fontBase
+        $dialog.Tag = 'Cancel'
+        if ($form.Icon) {
+            $dialog.Icon = $form.Icon
+        }
+
+        $dialog.Controls.Add((New-V2Label -Text 'Windows Update is active' -X 24 -Y 24 -Width 580 -Height 30 -Font $fontHero))
+        $message = "$ActivityMessage`r`n`r`nSnooz temporarily stops Windows Update services, runs PcNinja, then starts them again. Retry leaves Windows Update alone and schedules a retry using your retry policy."
+        $dialog.Controls.Add((New-V2Label -Text $message -X 24 -Y 70 -Width 590 -Height 92 -ForeColor $colors.Muted))
+
+        $snoozeChoice = New-V2Button -Text 'Snooz to run' -X 162 -Y 186 -Width 120 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+        $retryChoice = New-V2Button -Text 'Retry later' -X 298 -Y 186 -Width 120 -Height 34
+        $cancelChoice = New-V2Button -Text 'Cancel' -X 434 -Y 186 -Width 90 -Height 34 -BorderColor $colors.Border
+        $snoozeChoice.Add_Click({ $dialog.Tag = 'Snooze'; $dialog.Close() })
+        $retryChoice.Add_Click({ $dialog.Tag = 'Retry'; $dialog.Close() })
+        $cancelChoice.Add_Click({ $dialog.Tag = 'Cancel'; $dialog.Close() })
+        $dialog.Controls.AddRange([System.Windows.Forms.Control[]]@($snoozeChoice, $retryChoice, $cancelChoice))
+        $dialog.AcceptButton = $snoozeChoice
+        $dialog.CancelButton = $cancelChoice
+
+        $dialog.ShowDialog($form) | Out-Null
+        return [string]$dialog.Tag
+    }
+
+    function Request-V2WindowsUpdateRetry {
+        param([string]$Reason)
+
+        $config = Get-PcnWinUpdateConfig
+        $engineScriptPath = Get-V2MainScriptPath
+        $retry = Request-PcnWinUpdateRetry -ScriptPath $engineScriptPath -Config $config -Reason $Reason
+        $state = Get-PcnWinUpdateState
+        $state.LastRunFinished = (Get-Date).ToString('s')
+        $state.LastRunType = 'Manual'
+        $state.LastResult = $retry.Result
+        $state.LastMessage = $retry.Message
+        $state.LastRebootRequired = $false
+        Save-PcnWinUpdateState -State $state
+        $footerLabel.Text = $retry.Message
+        Refresh-V2Status
+        if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
+            Refresh-V2Logs -ScrollToEnd
+        }
+    }
+
     function Start-V2RunUpdates {
-        param([switch]$Snooz)
+        if ($uiState.ScanProcess -and -not $uiState.ScanProcess.HasExited) {
+            $footerLabel.Text = 'A check is already running.'
+            return
+        }
+
+        if (-not (Confirm-V2RestartGate -ActionName 'Install')) {
+            Refresh-V2Status
+            return
+        }
+
+        $scopeArguments = Get-V2UpdateScopeArguments
+        if ($null -eq $scopeArguments) {
+            return
+        }
+
+        if ([bool]$firmwareUpdatesCheck.Checked) {
+            $answer = [System.Windows.Forms.MessageBox]::Show(
+                "Firmware/BIOS updates are enabled for this run.`r`n`r`nContinue only if the machine is on reliable power and you are comfortable letting Windows Update install firmware packages.",
+                'Firmware Updates Enabled',
+                'YesNo',
+                'Warning'
+            )
+
+            if ($answer -ne 'Yes') {
+                $footerLabel.Text = 'Windows Update run cancelled.'
+                return
+            }
+        }
+
+        $allowStopBackgroundActivity = $false
+        $activity = Get-PcnWindowsUpdateActivity
+        if ($activity.IsInstalling -or $activity.HasBackgroundActivity) {
+            $choice = Show-V2WindowsUpdateSnoozeDialog -ActivityMessage $activity.Message
+            if ($choice -eq 'Retry') {
+                Request-V2WindowsUpdateRetry -Reason $activity.Message
+                return
+            }
+
+            if ($choice -eq 'Snooze') {
+                $allowStopBackgroundActivity = $true
+                $footerLabel.Text = 'Snoozing Windows Update activity.'
+            }
+            else {
+                $footerLabel.Text = 'Windows Update run cancelled.'
+                return
+            }
+        }
 
         $engineScriptPath = Get-V2MainScriptPath
-        $allow = if ($Snooz) { ' -AllowStopBackgroundActivity' } else { '' }
-        $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode RunUpdates -Silent -RunType Manual{1}' -f $engineScriptPath, $allow
+        $allow = if ($allowStopBackgroundActivity) { ' -AllowStopBackgroundActivity' } else { '' }
+        $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode RunUpdates -Silent -RunType Manual {1}{2}' -f $engineScriptPath, $scopeArguments, $allow
         Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath) | Out-Null
-        Write-PcnWinUpdateLog -Message "V2 update run requested. Snooz: $([bool]$Snooz). Engine: $engineScriptPath" -EventID 1084
-        $footerLabel.Text = if ($Snooz) { 'Snooz update run started.' } else { 'Windows Update run started.' }
+        Write-PcnWinUpdateLog -Message "V2 update run requested. Snooz: $allowStopBackgroundActivity. Scope: $scopeArguments. Engine: $engineScriptPath" -EventID 1084
+        $footerLabel.Text = if ($allowStopBackgroundActivity) { 'Snooz update run started.' } else { 'Windows Update run started.' }
     }
 
     function Start-V2ResetWindowsUpdate {
@@ -1111,11 +1428,63 @@ function Show-PcnWinUpdateV2Ui {
         Start-Process -FilePath explorer.exe -ArgumentList $paths.DriverReportRoot | Out-Null
     }
 
+    function Show-V2UpdateList {
+        $items = @($uiState.LastPreviewItems)
+        if ($items.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show('No update list is available yet. Run Check Available Updates first.', 'Available Updates', 'OK', 'Information') | Out-Null
+            return
+        }
+
+        $dialog = New-Object System.Windows.Forms.Form
+        $dialog.Text = 'Available Updates'
+        $dialog.StartPosition = 'CenterParent'
+        $dialog.FormBorderStyle = 'Sizable'
+        $dialog.MinimizeBox = $false
+        $dialog.ShowInTaskbar = $false
+        $dialog.ClientSize = New-V2Size 760 470
+        $dialog.MinimumSize = New-V2Size 620 360
+        $dialog.BackColor = $colors.CardBack
+        $dialog.ForeColor = $colors.Text
+        $dialog.Font = $fontBase
+        if ($form.Icon) {
+            $dialog.Icon = $form.Icon
+        }
+
+        $textBox = New-Object System.Windows.Forms.TextBox
+        $textBox.Multiline = $true
+        $textBox.ReadOnly = $true
+        $textBox.ScrollBars = 'Both'
+        $textBox.WordWrap = $false
+        $textBox.BorderStyle = 'FixedSingle'
+        $textBox.BackColor = $colors.Input
+        $textBox.ForeColor = $colors.Text
+        $textBox.Font = $fontMono
+        $textBox.Location = New-V2Point 16 16
+        $textBox.Size = New-V2Size 728 390
+        $textBox.Anchor = 'Top,Bottom,Left,Right'
+
+        $lines = foreach ($item in $items) {
+            $state = if ([bool]$item.Included) { 'Included' } else { 'Skipped' }
+            $kb = if ($item.Kb -and @($item.Kb).Count -gt 0) { " KB: $(@($item.Kb) -join ',')" } else { '' }
+            '{0} | {1} | {2}{3} | {4}' -f $state, $item.Scope, $item.Type, $kb, $item.Title
+        }
+        $textBox.Text = ($lines -join "`r`n")
+        $dialog.Controls.Add($textBox)
+
+        $closeChoice = New-V2Button -Text 'Close' -X 638 -Y 420 -Width 106 -Height 34 -BorderColor $colors.Border
+        $closeChoice.Anchor = 'Bottom,Right'
+        $closeChoice.Add_Click({ $dialog.Close() })
+        $dialog.Controls.Add($closeChoice)
+        $dialog.CancelButton = $closeChoice
+        $dialog.ShowDialog($form) | Out-Null
+    }
+
     function Set-V2PreviewControlsEnabled {
         param([bool]$Enabled)
 
-        $scanButton.Enabled = $Enabled
-        $previewButton.Enabled = $Enabled
+        $checkAvailableButton.Enabled = $Enabled
+        $installSelectedButton.Enabled = $Enabled
+        $viewUpdateListButton.Enabled = $Enabled
     }
 
     function Complete-V2UpdatePreviewIfReady {
@@ -1153,8 +1522,11 @@ function Show-PcnWinUpdateV2Ui {
             $importantCount.Text = [string]$scan.Important
             $optionalCount.Text = [string]$scan.Optional
             $driversCount.Text = [string]$scan.Drivers
+            $firmwareSkippedCount.Text = [string]$scan.FirmwareSkipped
+            $uiState.LastPreviewItems = @($scan.Items)
+            $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). Included: $($scan.Total), discovered: $($scan.TotalDiscovered)."
             $lastScanValue.Text = (Get-Date).ToString('dd-MMM HH:mm')
-            $footerLabel.Text = "Scan complete. Important: $($scan.Important), Optional: $($scan.Optional), Drivers: $($scan.Drivers)."
+            $footerLabel.Text = "Check complete. Important: $($scan.Important), Optional: $($scan.Optional), Drivers: $($scan.Drivers), Firmware skipped: $($scan.FirmwareSkipped)."
             Refresh-V2Status
             if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
                 Refresh-V2Logs -ScrollToEnd
@@ -1164,6 +1536,8 @@ function Show-PcnWinUpdateV2Ui {
             $importantCount.Text = '!'
             $optionalCount.Text = '!'
             $driversCount.Text = '!'
+            $firmwareSkippedCount.Text = '!'
+            $availableSummary.Text = 'Check failed. Open Logs for details.'
             $footerLabel.Text = "Preview scan failed: $($_.Exception.Message)"
             [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
         }
@@ -1185,15 +1559,27 @@ function Show-PcnWinUpdateV2Ui {
 
     function Invoke-V2UpdatePreview {
         if ($uiState.ScanProcess -and -not $uiState.ScanProcess.HasExited) {
-            $footerLabel.Text = 'A scan is already running.'
+            $footerLabel.Text = 'A check is already running.'
             return
         }
 
         try {
-            $footerLabel.Text = 'Starting Windows Update scan...'
+            if (-not (Confirm-V2RestartGate -ActionName 'Check')) {
+                Refresh-V2Status
+                return
+            }
+
+            $scopeArguments = Get-V2UpdateScopeArguments
+            if ($null -eq $scopeArguments) {
+                return
+            }
+
+            $footerLabel.Text = 'Starting Windows Update check...'
             $importantCount.Text = '...'
             $optionalCount.Text = '...'
             $driversCount.Text = '...'
+            $firmwareSkippedCount.Text = '...'
+            $availableSummary.Text = 'Checking Windows Update and Microsoft Update...'
             Set-V2PreviewControlsEnabled -Enabled $false
 
             $paths = Initialize-PcnWinUpdateFolders
@@ -1201,7 +1587,7 @@ function Show-PcnWinUpdateV2Ui {
             $uiState.ScanOutPath = Join-Path $paths.LogRoot "PreviewScan-$scanId.json"
             $uiState.ScanErrPath = Join-Path $paths.LogRoot "PreviewScan-$scanId.err"
             $engineScriptPath = Get-V2MainScriptPath
-            $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode PreviewUpdates -Json' -f $engineScriptPath
+            $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode PreviewUpdates -Json {1}' -f $engineScriptPath, $scopeArguments
 
             $process = Start-Process -FilePath (Get-PcnPowershellPath) `
                 -ArgumentList $arguments `
@@ -1212,7 +1598,7 @@ function Show-PcnWinUpdateV2Ui {
                 -PassThru
 
             $uiState.ScanProcess = $process
-            Write-PcnWinUpdateLog -Message "V2 preview scan started. PID: $($process.Id)." -EventID 1085
+            Write-PcnWinUpdateLog -Message "V2 available update check started. PID: $($process.Id). Scope: $scopeArguments." -EventID 1085
             $scanTimer.Start()
         }
         catch {
@@ -1220,7 +1606,9 @@ function Show-PcnWinUpdateV2Ui {
             $importantCount.Text = '!'
             $optionalCount.Text = '!'
             $driversCount.Text = '!'
-            $footerLabel.Text = "Preview scan failed to start: $($_.Exception.Message)"
+            $firmwareSkippedCount.Text = '!'
+            $availableSummary.Text = 'Check failed to start.'
+            $footerLabel.Text = "Update check failed to start: $($_.Exception.Message)"
             [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
         }
     }
@@ -1230,7 +1618,7 @@ function Show-PcnWinUpdateV2Ui {
             $toolStatusValue.Text = 'Checking'
             $toolStatusValue.ForeColor = $colors.Orange
             $form.Refresh()
-            $check = Invoke-PcnAppUpdateCheck -PackageType 'Msi'
+            $check = Invoke-PcnAppUpdateCheck -PackageType (Get-V2AppUpdatePackageType)
             $latest = if ($check.LatestPublicLabel) { [string]$check.LatestPublicLabel } else { [string]$check.LatestVersion }
             $latestValueSide.Text = $latest
             if ($check.Result -eq 'UpdateAvailable') {
@@ -1256,11 +1644,19 @@ function Show-PcnWinUpdateV2Ui {
     $sidebarUpdateButton.Add_Click({ Show-V2ToolUpdateDialog -Owner $form; Check-V2ToolUpdateInline })
     $settingsButton.Add_Click({ Show-V2Page -Name 'Schedule' })
     $helpButton.Add_Click({ Start-Process -FilePath 'https://help.pcninja.pro' | Out-Null })
-    $scanButton.Add_Click({ Invoke-V2UpdatePreview })
-    $previewButton.Add_Click({ Invoke-V2UpdatePreview })
-    $runUpdatesButton.Add_Click({ Start-V2RunUpdates })
-    $snoozButton.Add_Click({ Start-V2RunUpdates -Snooz })
-    $restartDetailsButton.Add_Click({ [System.Windows.Forms.MessageBox]::Show($restartLabel.Text, 'Restart State', 'OK', 'Information') | Out-Null })
+    $checkAvailableButton.Add_Click({ Invoke-V2UpdatePreview })
+    $installSelectedButton.Add_Click({ Start-V2RunUpdates })
+    $viewUpdateListButton.Add_Click({ Show-V2UpdateList })
+    $restartNowButton.Add_Click({
+        try {
+            Restart-PcnComputerNow
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Restart Now', 'OK', 'Warning') | Out-Null
+        }
+    })
+    $restartDetailsButton.Add_Click({ [System.Windows.Forms.MessageBox]::Show((Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot), 'Restart State', 'OK', 'Information') | Out-Null })
+    $dashboardResetButton.Add_Click({ Start-V2ResetWindowsUpdate })
     $saveScheduleButton.Add_Click({ Save-V2Schedule })
     $driverAuditButton.Add_Click({ Start-V2DriverAudit })
     $openDriverReportButton.Add_Click({ Open-V2DriverReports })

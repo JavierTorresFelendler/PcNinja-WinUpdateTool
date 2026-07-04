@@ -401,6 +401,90 @@ function Invoke-PcnUpdateSearchBucket {
     }
 }
 
+function New-PcnUpdateScope {
+    param(
+        [switch]$UseExplicitUpdateScope,
+        [bool]$IncludeWindowsUpdates,
+        [bool]$IncludeOptionalUpdates,
+        [bool]$IncludeDriverUpdates,
+        [bool]$IncludeFirmwareUpdates
+    )
+
+    if (-not $UseExplicitUpdateScope) {
+        $IncludeWindowsUpdates = $true
+        $IncludeOptionalUpdates = $true
+        $IncludeDriverUpdates = $true
+    }
+
+    [pscustomobject]@{
+        Windows = [bool]$IncludeWindowsUpdates
+        Optional = [bool]$IncludeOptionalUpdates
+        Drivers = [bool]$IncludeDriverUpdates
+        Firmware = [bool]$IncludeFirmwareUpdates
+    }
+}
+
+function Get-PcnUpdateScopeKind {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Update
+    )
+
+    if ((Get-PcnUpdateTypeName -Update $Update) -eq 'Driver') {
+        return 'Driver'
+    }
+
+    try {
+        if ([bool]$Update.BrowseOnly) {
+            return 'Optional'
+        }
+    }
+    catch {
+        $null = $_
+    }
+
+    return 'Windows'
+}
+
+function Test-PcnUpdateIncludedByScope {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Update,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Scope
+    )
+
+    if (Test-PcnFirmwareUpdate -Update $Update) {
+        return [bool]$Scope.Firmware
+    }
+
+    switch (Get-PcnUpdateScopeKind -Update $Update) {
+        'Driver' { return [bool]$Scope.Drivers }
+        'Optional' { return [bool]$Scope.Optional }
+        default { return [bool]$Scope.Windows }
+    }
+}
+
+function Get-PcnUpdateScopeSummary {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Scope
+    )
+
+    $parts = @()
+    if ([bool]$Scope.Windows) { $parts += 'Windows' }
+    if ([bool]$Scope.Optional) { $parts += 'Optional' }
+    if ([bool]$Scope.Drivers) { $parts += 'Drivers' }
+    if ([bool]$Scope.Firmware) { $parts += 'Firmware/BIOS' }
+
+    if ($parts.Count -eq 0) {
+        return 'None'
+    }
+
+    return ($parts -join ', ')
+}
+
 function Enable-PcnMicrosoftUpdate {
     if (-not (Test-PcnAdministrator)) {
         throw 'Administrator privileges are required to enable Microsoft Update.'
@@ -2703,6 +2787,10 @@ function Start-PcnWindowsUpdateInstall {
         [switch]$Silent,
         [switch]$ShowRebootPrompt,
         [switch]$AllowStopBackgroundActivity,
+        [switch]$UseExplicitUpdateScope,
+        [switch]$IncludeWindowsUpdates,
+        [switch]$IncludeOptionalUpdates,
+        [switch]$IncludeDriverUpdates,
         [switch]$InstallFirmwareUpdates,
         [ValidateRange(1, 10)]
         [int]$MaxPasses = 3
@@ -2738,6 +2826,14 @@ function Start-PcnWindowsUpdateInstall {
 
         Initialize-PcnWindowsUpdateServices
         Enable-PcnMicrosoftUpdate | Out-Null
+
+        $updateScope = New-PcnUpdateScope `
+            -UseExplicitUpdateScope:$UseExplicitUpdateScope `
+            -IncludeWindowsUpdates:([bool]$IncludeWindowsUpdates) `
+            -IncludeOptionalUpdates:([bool]$IncludeOptionalUpdates) `
+            -IncludeDriverUpdates:([bool]$IncludeDriverUpdates) `
+            -IncludeFirmwareUpdates:([bool]$InstallFirmwareUpdates)
+        Write-PcnWinUpdateLog -Message "Windows Update run scope: $(Get-PcnUpdateScopeSummary -Scope $updateScope)." -EventID 1089
 
         if ($InstallFirmwareUpdates) {
             Write-PcnWinUpdateLog -Message 'Firmware/BIOS update installation is enabled for this run.' -EntryType Warning -EventID 1087
@@ -2805,6 +2901,7 @@ function Start-PcnWindowsUpdateInstall {
 
             $updateCollection = New-Object -ComObject Microsoft.Update.UpdateColl
             $skippedFirmwareCount = 0
+            $skippedScopeCount = 0
 
             foreach ($entry in $mergedUpdates) {
                 $update = $entry.Update
@@ -2814,6 +2911,13 @@ function Start-PcnWindowsUpdateInstall {
                 if ($isFirmware -and -not $InstallFirmwareUpdates) {
                     $skippedFirmwareCount++
                     Write-PcnWinUpdateLog -Message "Pass $pass skipping firmware/BIOS candidate because firmware installation is disabled: $($update.Title) | Sources: $sources" -EntryType Warning -EventID 1088
+                    continue
+                }
+
+                if (-not (Test-PcnUpdateIncludedByScope -Update $update -Scope $updateScope)) {
+                    $skippedScopeCount++
+                    $scopeKind = Get-PcnUpdateScopeKind -Update $update
+                    Write-PcnWinUpdateLog -Message "Pass $pass skipping $scopeKind candidate outside selected update scope: $($update.Title) | Sources: $sources" -EntryType Information -EventID 1089
                     continue
                 }
 
@@ -2837,6 +2941,9 @@ function Start-PcnWindowsUpdateInstall {
                 $message = if ($skippedFirmwareCount -gt 0) {
                     "Only firmware/BIOS candidate update(s) were found ($skippedFirmwareCount), and firmware installation is disabled."
                 }
+                elseif ($skippedScopeCount -gt 0) {
+                    "Only update candidate(s) outside the selected scope were found ($skippedScopeCount)."
+                }
                 else {
                     'No installable Windows, optional, or driver updates remained after filtering.'
                 }
@@ -2851,7 +2958,7 @@ function Start-PcnWindowsUpdateInstall {
                 }
             }
 
-            Write-PcnWinUpdateLog -Message "Pass $pass downloading $($updateCollection.Count) update(s) as one Windows Update batch. Firmware skipped: $skippedFirmwareCount." -EventID 1007
+            Write-PcnWinUpdateLog -Message "Pass $pass downloading $($updateCollection.Count) update(s) as one Windows Update batch. Firmware skipped: $skippedFirmwareCount. Scope skipped: $skippedScopeCount." -EventID 1007
             $downloader = $updateSession.CreateUpdateDownloader()
             $downloader.Updates = $updateCollection
             $downloadResult = $downloader.Download()
@@ -3056,7 +3163,17 @@ function Invoke-PcnManagedWindowsUpdateRun {
 
         [switch]$ShowRebootPrompt,
 
-        [switch]$AllowStopBackgroundActivity
+        [switch]$AllowStopBackgroundActivity,
+
+        [switch]$UseExplicitUpdateScope,
+
+        [switch]$IncludeWindowsUpdates,
+
+        [switch]$IncludeOptionalUpdates,
+
+        [switch]$IncludeDriverUpdates,
+
+        [switch]$IncludeFirmwareUpdates
     )
 
     $config = Get-PcnWinUpdateConfig
@@ -3175,7 +3292,16 @@ function Invoke-PcnManagedWindowsUpdateRun {
             Unregister-PcnWinUpdateRetryTask
         }
 
-        $result = Start-PcnWindowsUpdateInstall -Silent:$Silent -ShowRebootPrompt:$ShowRebootPrompt -AllowStopBackgroundActivity:$AllowStopBackgroundActivity -InstallFirmwareUpdates:([bool]$config.InstallFirmwareUpdates)
+        $installFirmwareForRun = ([bool]$config.InstallFirmwareUpdates) -or ([bool]$IncludeFirmwareUpdates)
+        $result = Start-PcnWindowsUpdateInstall `
+            -Silent:$Silent `
+            -ShowRebootPrompt:$ShowRebootPrompt `
+            -AllowStopBackgroundActivity:$AllowStopBackgroundActivity `
+            -UseExplicitUpdateScope:$UseExplicitUpdateScope `
+            -IncludeWindowsUpdates:$IncludeWindowsUpdates `
+            -IncludeOptionalUpdates:$IncludeOptionalUpdates `
+            -IncludeDriverUpdates:$IncludeDriverUpdates `
+            -InstallFirmwareUpdates:$installFirmwareForRun
 
         if ($result.Result -in @('SkippedInstalling', 'SkippedBackgroundActivity')) {
             $retry = Request-PcnWinUpdateRetry -ScriptPath $ScriptPath -Config $config -Reason $result.Message
@@ -3222,6 +3348,13 @@ Export-ModuleMember -Function `
     Convert-PcnUpdateKbList, `
     Convert-PcnUpdateCategoryList, `
     Get-PcnUpdateTypeName, `
+    Test-PcnFirmwareUpdate, `
+    New-PcnUpdateScope, `
+    Get-PcnUpdateScopeKind, `
+    Test-PcnUpdateIncludedByScope, `
+    Get-PcnUpdateScopeSummary, `
+    Invoke-PcnUpdateSearchBucket, `
+    Get-PcnMergedUpdateList, `
     Write-PcnUpdateDiscoveryLog, `
     Enable-PcnMicrosoftUpdate, `
     Test-PcnNetworkReadiness, `

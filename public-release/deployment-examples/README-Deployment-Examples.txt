@@ -20,6 +20,7 @@ App update modes:
   AppUpdateCheck reads update-manifest.json and reports whether a newer release exists.
   AppUpdateDownload downloads and verifies the selected release package.
   AppUpdateInstall is user-initiated and is intended for installed MSI deployments.
+  Portable EXE update downloads use the versioned portable file name from the manifest.
 
 CMD line-continuation rule:
   The ^ character is only for CMD/BAT line continuation.
