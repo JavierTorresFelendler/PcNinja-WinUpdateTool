@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet('UI', 'RunUpdates', 'ShowLog', 'DriverReport', 'DriverAudit', 'Status', 'Configure', 'RunOnceTask', 'CollectLogs', 'ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache', 'AppUpdateCheck', 'AppUpdateDownload', 'AppUpdateInstall')]
     [string]$Mode = 'UI',
 
@@ -84,8 +84,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC5'
-        Version = '2.0.4.0'
+        PublicLabel = 'V2.0.0-RC6'
+        Version = '2.0.5.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -1351,6 +1351,7 @@ if ($Mode -eq 'CollectLogs') {
 if ($Mode -eq 'UI') {
     $v2UiPath = Join-Path $PSScriptRoot 'WinUpdateTool.V2Ui.ps1'
     if (Test-Path -LiteralPath $v2UiPath -PathType Leaf) {
+        $script:PcnMainScriptPath = $PSCommandPath
         . $v2UiPath
         Show-PcnWinUpdateV2Ui
         exit 0
@@ -4257,12 +4258,3 @@ catch {
 
     exit 1
 }
-
-
-
-
-
-
-
-
-

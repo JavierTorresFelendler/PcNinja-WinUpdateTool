@@ -292,14 +292,42 @@ function Show-PcnWinUpdateV2Ui {
         }
     }
 
+    function Get-V2MainScriptPath {
+        if ($script:PcnMainScriptPath -and (Test-Path -LiteralPath $script:PcnMainScriptPath -PathType Leaf)) {
+            return $script:PcnMainScriptPath
+        }
+
+        $candidate = Join-Path $PSScriptRoot 'WinUpdateTool.ps1'
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return $candidate
+        }
+
+        return $PSCommandPath
+    }
+
     function Start-V2ToolProcess {
         param(
             [Parameter(Mandatory = $true)]
-            [string]$Arguments
+            [string]$Arguments,
+
+            [string]$WorkingDirectory
         )
 
         $powershell = Get-PcnPowershellPath
-        Start-Process -FilePath $powershell -ArgumentList $Arguments -WindowStyle Hidden | Out-Null
+        $startInfo = @{
+            FilePath = $powershell
+            ArgumentList = $Arguments
+            WindowStyle = 'Hidden'
+            PassThru = $true
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $startInfo.WorkingDirectory = $WorkingDirectory
+        }
+
+        $process = Start-Process @startInfo
+        Write-PcnWinUpdateLog -Message "V2 background process started. PID: $($process.Id)." -EventID 1083
+        return $process
     }
 
     function Show-V2ToolUpdateDialog {
@@ -991,7 +1019,8 @@ function Show-PcnWinUpdateV2Ui {
             $config.MinimumCooldownMinutes = [int]$config.RetryInitialDelayMinutes
             $config.DisplayTheme = 'Dark'
             Save-PcnWinUpdateConfig -Config $config
-            Register-PcnWinUpdateScheduledTask -Config $config -ScriptPath $PSCommandPath
+            $engineScriptPath = Get-V2MainScriptPath
+            Register-PcnWinUpdateScheduledTask -Config $config -ScriptPath $engineScriptPath
             $footerLabel.Text = 'Schedule saved.'
             Refresh-V2Status
         }
@@ -1003,9 +1032,11 @@ function Show-PcnWinUpdateV2Ui {
     function Start-V2RunUpdates {
         param([switch]$Snooz)
 
+        $engineScriptPath = Get-V2MainScriptPath
         $allow = if ($Snooz) { ' -AllowStopBackgroundActivity' } else { '' }
-        $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode RunUpdates -Silent -RunType Manual{1}' -f $PSCommandPath, $allow
-        Start-V2ToolProcess -Arguments $arguments
+        $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode RunUpdates -Silent -RunType Manual{1}' -f $engineScriptPath, $allow
+        Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath) | Out-Null
+        Write-PcnWinUpdateLog -Message "V2 update run requested. Snooz: $([bool]$Snooz). Engine: $engineScriptPath" -EventID 1084
         $footerLabel.Text = if ($Snooz) { 'Snooz update run started.' } else { 'Windows Update run started.' }
     }
 
@@ -1021,8 +1052,9 @@ function Show-PcnWinUpdateV2Ui {
             return
         }
 
-        $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode ResetWindowsUpdate -ConfirmReset' -f $PSCommandPath
-        Start-V2ToolProcess -Arguments $arguments
+        $engineScriptPath = Get-V2MainScriptPath
+        $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode ResetWindowsUpdate -ConfirmReset' -f $engineScriptPath
+        Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath) | Out-Null
         $footerLabel.Text = 'Windows Update reset started.'
     }
 

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$CreateDesktopShortcut,
     [switch]$RunAfterInstall
 )
@@ -28,7 +28,7 @@ $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
 $installAssetsDir = Join-Path $installDir 'assets'
 $appIconPath = Join-Path $installAssetsDir 'PcNinja.ico'
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PcNinja WinUpdate Tool'
-$appVersion = '2.0.4.0'
+$appVersion = '2.0.5.0'
 $versionFile = Join-Path $sourceDir 'version.json'
 
 if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
@@ -39,7 +39,7 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
         }
     }
     catch {
-        $appVersion = '2.0.4.0'
+        $appVersion = '2.0.5.0'
     }
 }
 
@@ -143,12 +143,3 @@ if ($RunAfterInstall) {
         Start-Process -FilePath $powershell -ArgumentList ('-STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode UI' -f (Join-Path $installDir 'WinUpdateTool.ps1')) -WindowStyle Hidden | Out-Null
     }
 }
-
-
-
-
-
-
-
-
-

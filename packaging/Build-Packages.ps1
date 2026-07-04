@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Version,
     [string]$PublicLabel,
     [string]$ReleaseTag,
@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.4.0'
+    $Version = '2.0.5.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC5'
+    $PublicLabel = 'V2.0.0-RC6'
 }
 
 if (-not $Repository) {
@@ -558,6 +558,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Adds shared version manifest foundation.',
     '- Adds app update check/download/install CLI foundations.',
     '- Adds public update-manifest.json for GitHub Releases.',
+    '- Fixes V2 UI manual run, Snooz run, reset, and schedule actions to launch WinUpdateTool.ps1.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',
@@ -614,17 +615,3 @@ Set-Content -LiteralPath ($publicZipPath + '.sha256.txt') -Value ("{0}  {1}" -f 
 
 Get-FileHash -LiteralPath $msiPath, $portableExePath, $hostExePath, $cliExePath, $publicMsiPath, $publicPortablePath, $publicZipPath -Algorithm SHA256 |
     Select-Object Algorithm, Hash, Path
-
-
-
-
-
-
-
-
-
-
-
-
-
-

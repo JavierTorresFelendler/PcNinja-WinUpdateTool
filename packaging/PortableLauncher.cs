@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -11,13 +11,13 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.0.4.0")]
-[assembly: AssemblyFileVersion("2.0.4.0")]
-[assembly: AssemblyInformationalVersion("V2.0.0-RC5")]
+[assembly: AssemblyVersion("2.0.5.0")]
+[assembly: AssemblyFileVersion("2.0.5.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC6")]
 
 internal static class PortableLauncher
 {
-    private const string Version = "2.0.4.0";
+    private const string Version = "2.0.5.0";
     private const string PayloadResourceName = "PcNinjaPortablePayload";
 
     [STAThread]
@@ -231,7 +231,7 @@ internal static class PortableLauncher
         string executableName = Path.GetFileName(Application.ExecutablePath);
         if (String.IsNullOrWhiteSpace(executableName))
         {
-            executableName = "PcNinja-WinUpdateTool-V2.0.0-RC5-Portable.exe";
+            executableName = "PcNinja-WinUpdateTool-V2.0.0-RC6-Portable.exe";
         }
 
         StringBuilder builder = new StringBuilder();
@@ -379,12 +379,3 @@ internal static class PortableLauncher
         }
     }
 }
-
-
-
-
-
-
-
-
-
