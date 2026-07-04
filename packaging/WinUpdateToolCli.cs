@@ -9,13 +9,13 @@ using System.Text;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.0.5.0")]
-[assembly: AssemblyFileVersion("2.0.5.0")]
-[assembly: AssemblyInformationalVersion("V2.0.0-RC6")]
+[assembly: AssemblyVersion("2.0.6.0")]
+[assembly: AssemblyFileVersion("2.0.6.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC7")]
 
 internal static class WinUpdateToolCli
 {
-    private const string Version = "V2.0.0-RC6";
+    private const string Version = "V2.0.0-RC7";
 
     private static int Main(string[] args)
     {
@@ -146,6 +146,7 @@ internal static class WinUpdateToolCli
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe /?");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Status -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode DriverAudit -Json");
+        Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode PreviewUpdates -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode CollectLogs -OutputPath C:\\Temp -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode RunUpdates -Silent -RunType Manual -Json");
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode ResetWindowsUpdate -ConfirmReset -Json");
@@ -156,7 +157,7 @@ internal static class WinUpdateToolCli
         Console.WriteLine("  PcNinja.WinUpdateTool.Cli.exe -Mode Configure -ConfigFile C:\\Temp\\pcninja-install.json -Json");
         Console.WriteLine();
         Console.WriteLine("Modes:");
-        Console.WriteLine("  UI, Status, RunUpdates, ResetWindowsUpdate, Configure, DriverAudit, DriverReport, CollectLogs, ShowLog, RunOnceTask, AppUpdateCheck, AppUpdateDownload, AppUpdateInstall");
+        Console.WriteLine("  UI, Status, PreviewUpdates, RunUpdates, ResetWindowsUpdate, Configure, DriverAudit, DriverReport, CollectLogs, ShowLog, RunOnceTask, AppUpdateCheck, AppUpdateDownload, AppUpdateInstall");
         Console.WriteLine();
         Console.WriteLine("Common options:");
         Console.WriteLine("  -Json");

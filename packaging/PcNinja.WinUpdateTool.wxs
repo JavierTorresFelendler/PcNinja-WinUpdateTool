@@ -21,7 +21,7 @@
     <Icon Id="PcNinjaIcon" SourceFile="$(SourceDir)\assets\PcNinja.ico" />
     <Property Id="ARPPRODUCTICON" Value="PcNinjaIcon" />
     <Property Id="ARPURLINFOABOUT" Value="https://www.PcNinja.Pro" />
-    <Property Id="ARPHELPLINK" Value="https://www.PcNinja.Pro" />
+    <Property Id="ARPHELPLINK" Value="https://help.pcninja.pro" />
     <Property Id="PCNINJA_ENABLE_SCHEDULE" Secure="yes" />
     <Property Id="PCNINJA_FREQUENCY" Value="Monthly" Secure="yes" />
     <Property Id="PCNINJA_TIME" Value="03:00" Secure="yes" />

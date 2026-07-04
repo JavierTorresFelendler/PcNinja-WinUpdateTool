@@ -8,9 +8,9 @@ function Show-PcnWinUpdateV2Ui {
         AppBack = [System.Drawing.Color]::FromArgb(8, 13, 18)
         HeaderBack = [System.Drawing.Color]::FromArgb(7, 11, 16)
         SidebarBack = [System.Drawing.Color]::FromArgb(16, 22, 28)
-        CardBack = [System.Drawing.Color]::FromArgb(20, 27, 34)
-        CardAlt = [System.Drawing.Color]::FromArgb(17, 24, 31)
-        Border = [System.Drawing.Color]::FromArgb(47, 59, 69)
+        CardBack = [System.Drawing.Color]::FromArgb(18, 24, 30)
+        CardAlt = [System.Drawing.Color]::FromArgb(14, 20, 26)
+        Border = [System.Drawing.Color]::FromArgb(33, 43, 53)
         Text = [System.Drawing.Color]::FromArgb(238, 245, 252)
         Muted = [System.Drawing.Color]::FromArgb(157, 172, 186)
         Blue = [System.Drawing.Color]::FromArgb(25, 120, 215)
@@ -112,6 +112,7 @@ function Show-PcnWinUpdateV2Ui {
         $panel.BackColor = $colors.CardBack
         $panel.Location = New-V2Point $X $Y
         $panel.Size = New-V2Size $Width $Height
+        $panel.Margin = New-Object System.Windows.Forms.Padding(0)
         Add-V2BorderPaint -Control $panel
 
         if (-not [string]::IsNullOrWhiteSpace($Title)) {
@@ -140,6 +141,7 @@ function Show-PcnWinUpdateV2Ui {
         $button.BackColor = $BackColor
         $button.FlatStyle = 'Flat'
         $button.FlatAppearance.BorderColor = $BorderColor
+        $button.FlatAppearance.BorderSize = 1
         $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(28, 45, 62)
         $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(24, 92, 160)
         $button.UseVisualStyleBackColor = $false
@@ -629,14 +631,6 @@ function Show-PcnWinUpdateV2Ui {
     $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 402 -Width 228 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
     $sidebar.Controls.Add($sidebarUpdateButton)
 
-    $quickActions = New-V2Card -X 16 -Y 462 -Width 228 -Height 112 -Title 'Quick Actions'
-    $quickActions.BackColor = $colors.CardAlt
-    $sidebar.Controls.Add($quickActions)
-    $quickScanButton = New-V2Button -Text 'Scan for Updates' -X 14 -Y 38 -Width 200 -Height 28
-    $quickLogsButton = New-V2Button -Text 'View Logs' -X 14 -Y 72 -Width 96 -Height 28 -BorderColor $colors.Border
-    $quickResetButton = New-V2Button -Text 'Reset WU' -X 118 -Y 72 -Width 96 -Height 28 -BorderColor $colors.Red -ForeColor $colors.Red
-    $quickActions.Controls.AddRange([System.Windows.Forms.Control[]]@($quickScanButton, $quickLogsButton, $quickResetButton))
-
     $tabHost = New-Object System.Windows.Forms.Panel
     $tabHost.BackColor = $colors.HeaderBack
     $tabHost.Location = New-V2Point 280 54
@@ -662,27 +656,49 @@ function Show-PcnWinUpdateV2Ui {
     }
 
     $tabButtons = @{}
+    function Show-V2Page {
+        param([Parameter(Mandatory = $true)][string]$Name)
+
+        foreach ($entry in $pages.GetEnumerator()) {
+            $entry.Value.Visible = ($entry.Key -eq $Name)
+        }
+
+        foreach ($tabEntry in $tabButtons.GetEnumerator()) {
+            $tabEntry.Value.BackColor = $colors.HeaderBack
+            $tabEntry.Value.FlatAppearance.BorderColor = $colors.Border
+        }
+
+        if ($tabButtons.ContainsKey($Name)) {
+            $tabButtons[$Name].BackColor = $colors.Blue
+            $tabButtons[$Name].FlatAppearance.BorderColor = $colors.Blue2
+        }
+
+        if ($Name -eq 'Schedule') {
+            $settingsButton.BackColor = $colors.Blue
+            $settingsButton.FlatAppearance.BorderColor = $colors.Blue2
+        }
+        else {
+            $settingsButton.BackColor = $colors.HeaderBack
+            $settingsButton.FlatAppearance.BorderColor = $colors.Border
+        }
+
+        if ($Name -eq 'Logs') {
+            Refresh-V2Logs -ScrollToEnd
+            $logFollowTimer.Start()
+        }
+    }
+
     $tabX = 0
-    foreach ($name in @('Dashboard', 'Updates', 'Schedule', 'Drivers', 'Logs')) {
-        $button = New-V2Button -Text $name -X $tabX -Y 0 -Width 138 -Height 42 -BorderColor $colors.Border
+    foreach ($name in @('Dashboard', 'Updates', 'Drivers', 'Logs')) {
+        $button = New-V2Button -Text $name -X $tabX -Y 0 -Width 172 -Height 42 -BorderColor $colors.Border
         $button.Tag = $name
         $button.Add_Click({
             param($sender, $eventArgs)
-            foreach ($entry in $pages.GetEnumerator()) {
-                $entry.Value.Visible = ($entry.Key -eq [string]$sender.Tag)
-            }
-
-            foreach ($tabEntry in $tabButtons.GetEnumerator()) {
-                $tabEntry.Value.BackColor = $colors.HeaderBack
-                $tabEntry.Value.FlatAppearance.BorderColor = $colors.Border
-            }
-
-            $sender.BackColor = $colors.Blue
-            $sender.FlatAppearance.BorderColor = $colors.Blue2
+            Show-V2Page -Name ([string]$sender.Tag)
         })
         $tabHost.Controls.Add($button)
         $tabButtons[$name] = $button
-        $tabX += 138
+        $tabX += 172
     }
 
     $footer = New-Object System.Windows.Forms.StatusStrip
@@ -700,6 +716,13 @@ function Show-PcnWinUpdateV2Ui {
     [void]$footer.Items.Add($systemLabel)
     $form.Controls.Add($footer)
 
+    $uiState = [pscustomobject]@{
+        LogFollow = $true
+        ScanProcess = $null
+        ScanOutPath = $null
+        ScanErrPath = $null
+    }
+
     $smokeTimer = New-Object System.Windows.Forms.Timer
     $smokeTimer.Interval = 1500
     $smokeTimer.Add_Tick({
@@ -707,21 +730,28 @@ function Show-PcnWinUpdateV2Ui {
         $form.Close()
     })
 
+    $logFollowTimer = New-Object System.Windows.Forms.Timer
+    $logFollowTimer.Interval = 1500
+    $logFollowTimer.Add_Tick({
+        if ($pages.ContainsKey('Logs') -and $pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
+            Refresh-V2Logs -ScrollToEnd
+        }
+    })
+
+    $scanTimer = New-Object System.Windows.Forms.Timer
+    $scanTimer.Interval = 750
+    $scanTimer.Add_Tick({
+        Complete-V2UpdatePreviewIfReady
+    })
+
     $dashboard = $pages['Dashboard']
     $dashboard.Controls.Add((New-V2Label -Text 'Dashboard' -X 0 -Y 0 -Width 240 -Height 32 -Font $fontHero))
-    $overviewCard = New-V2Card -X 0 -Y 44 -Width 595 -Height 150 -Title 'System Update Overview'
+    $overviewCard = New-V2Card -X 0 -Y 44 -Width 870 -Height 150 -Title 'System Update Overview'
     $overviewIcon = New-V2Label -Text ([string][char]0xE73E) -X 22 -Y 48 -Width 70 -Height 58 -Font (New-Object System.Drawing.Font('Segoe MDL2 Assets', 38)) -ForeColor $colors.Green -Align 'MiddleCenter'
-    $overviewStatus = New-V2Label -Text 'Your system is ready.' -X 108 -Y 54 -Width 450 -Height 30 -Font $fontTitle
-    $overviewSub = New-V2Label -Text 'Use the Updates tab to scan, install, snooz, or review restart status.' -X 108 -Y 88 -Width 450 -Height 26 -ForeColor $colors.Muted
+    $overviewStatus = New-V2Label -Text 'Your system is ready.' -X 108 -Y 54 -Width 700 -Height 30 -Font $fontTitle
+    $overviewSub = New-V2Label -Text 'Use Updates for Windows Update runs, Settings for scheduling, and Logs for live progress.' -X 108 -Y 88 -Width 700 -Height 26 -ForeColor $colors.Muted
     $overviewCard.Controls.AddRange([System.Windows.Forms.Control[]]@($overviewIcon, $overviewStatus, $overviewSub))
     $dashboard.Controls.Add($overviewCard)
-
-    $updateCard = New-V2Card -X 610 -Y 44 -Width 260 -Height 150 -Title 'PcNinja Tool Update'
-    $toolUpdateHeadline = New-V2Label -Text 'Check available' -X 20 -Y 48 -Width 220 -Height 28 -Font $fontTitle -ForeColor $colors.Purple
-    $toolUpdateCurrent = New-V2Label -Text "Current: $script:PcnToolPublicLabel" -X 20 -Y 78 -Width 220 -Height 24 -ForeColor $colors.Muted
-    $toolUpdateButton = New-V2Button -Text 'Check Tool Update' -X 20 -Y 108 -Width 220 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
-    $updateCard.Controls.AddRange([System.Windows.Forms.Control[]]@($toolUpdateHeadline, $toolUpdateCurrent, $toolUpdateButton))
-    $dashboard.Controls.Add($updateCard)
 
     $scheduleSummaryCard = New-V2Card -X 0 -Y 210 -Width 430 -Height 150 -Title 'Schedule Summary'
     $scheduleSummaryText = New-V2Label -Text 'Loading schedule...' -X 20 -Y 48 -Width 380 -Height 72 -Font $fontTitle -ForeColor $colors.Blue2
@@ -734,14 +764,6 @@ function Show-PcnWinUpdateV2Ui {
     $healthSub = New-V2Label -Text 'No blocking condition detected by the local status check.' -X 70 -Y 94 -Width 330 -Height 24 -ForeColor $colors.Muted
     $healthCard.Controls.AddRange([System.Windows.Forms.Control[]]@($healthText, $healthSub))
     $dashboard.Controls.Add($healthCard)
-
-    $dashActionsCard = New-V2Card -X 0 -Y 376 -Width 870 -Height 115 -Title 'Quick Actions'
-    $dashRunButton = New-V2Button -Text 'Run Updates' -X 20 -Y 54 -Width 180 -Height 38 -BackColor ([System.Drawing.Color]::FromArgb(12, 74, 142))
-    $dashAuditButton = New-V2Button -Text 'Create Driver Audit' -X 216 -Y 54 -Width 180 -Height 38
-    $dashLogsButton = New-V2Button -Text 'View Logs' -X 412 -Y 54 -Width 150 -Height 38
-    $dashResetButton = New-V2Button -Text 'Reset Windows Update' -X 578 -Y 54 -Width 220 -Height 38 -BorderColor $colors.Red -ForeColor $colors.Red
-    $dashActionsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($dashRunButton, $dashAuditButton, $dashLogsButton, $dashResetButton))
-    $dashboard.Controls.Add($dashActionsCard)
 
     $updates = $pages['Updates']
     $manualCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 130 -Title 'Manual Windows Updates'
@@ -845,12 +867,12 @@ function Show-PcnWinUpdateV2Ui {
     $drivers.Controls.Add($reportCard)
 
     $toolsCard = New-V2Card -X 0 -Y 192 -Width 420 -Height 210 -Title 'PcNinja Tools'
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 52))
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 84))
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Activation' -Url 'https://active.pcninja.pro' -X 20 -Y 116))
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 20 -Y 148))
-    $toolsCard.Controls.Add((New-V2Label -Text 'PcNinja file password:' -X 236 -Y 52 -Width 164 -Height 24 -ForeColor $colors.Muted))
-    $passwordBox = New-V2TextBox -X 236 -Y 82 -Width 150 -Text 'JavierTorres'
+    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 52 -Width 195))
+    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 84 -Width 195))
+    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Activation' -Url 'https://active.pcninja.pro' -X 20 -Y 116 -Width 195))
+    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 20 -Y 148 -Width 195))
+    $toolsCard.Controls.Add((New-V2Label -Text 'File password:' -X 250 -Y 52 -Width 145 -Height 24 -ForeColor $colors.Muted))
+    $passwordBox = New-V2TextBox -X 250 -Y 82 -Width 145 -Text 'JavierTorres'
     $passwordBox.ReadOnly = $true
     $passwordBox.TextAlign = 'Center'
     $toolsCard.Controls.Add($passwordBox)
@@ -868,7 +890,7 @@ function Show-PcnWinUpdateV2Ui {
     $logsCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 510 -Title 'Application Logs'
     $logsCard.Controls.Add((New-V2Label -Text 'View and analyze tool logs for troubleshooting.' -X 20 -Y 40 -Width 400 -Height 24 -ForeColor $colors.Muted))
     $refreshLogsButton = New-V2Button -Text 'Refresh' -X 20 -Y 72 -Width 110 -Height 30
-    $followLogsButton = New-V2Button -Text 'Follow' -X 140 -Y 72 -Width 110 -Height 30
+    $followLogsButton = New-V2Button -Text 'Following' -X 140 -Y 72 -Width 110 -Height 30
     $bottomLogsButton = New-V2Button -Text 'Bottom' -X 260 -Y 72 -Width 110 -Height 30
     $filterBox = New-V2TextBox -X 610 -Y 72 -Width 230 -Height 28 -Text ''
     $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $filterBox))
@@ -888,6 +910,8 @@ function Show-PcnWinUpdateV2Ui {
     $logs.Controls.Add($logsCard)
 
     function Refresh-V2Logs {
+        param([switch]$ScrollToEnd)
+
         try {
             $paths = Initialize-PcnWinUpdateFolders
             if (-not (Test-Path -LiteralPath $paths.LogFile)) {
@@ -901,7 +925,16 @@ function Show-PcnWinUpdateV2Ui {
                 $lines = $lines | Where-Object { $_ -like "*$filter*" }
             }
 
-            $logBox.Text = ($lines -join "`r`n")
+            $nextText = ($lines -join "`r`n")
+            if ($logBox.Text -ne $nextText) {
+                $logBox.Text = $nextText
+            }
+
+            if ($ScrollToEnd -or [bool]$uiState.LogFollow) {
+                $logBox.SelectionStart = $logBox.TextLength
+                $logBox.ScrollToCaret()
+            }
+
             $logFooter.Text = "Log file: $($paths.LogFile)    Lines loaded: $(@($lines).Count)"
         }
         catch {
@@ -913,8 +946,8 @@ function Show-PcnWinUpdateV2Ui {
         try {
             $state = Get-PcnWinUpdateState
             $config = Get-PcnWinUpdateConfig
-            $lastRun = Format-V2Date -Value $state.LastRunStart
-            $lastInstall = Format-V2Date -Value $state.LastRunEnd
+            $lastRun = Format-V2Date -Value $state.LastRunStarted
+            $lastInstall = Format-V2Date -Value $state.LastRunFinished
             $lastScanValue.Text = $lastRun
             $lastInstallValue.Text = $lastInstall
 
@@ -1078,55 +1111,54 @@ function Show-PcnWinUpdateV2Ui {
         Start-Process -FilePath explorer.exe -ArgumentList $paths.DriverReportRoot | Out-Null
     }
 
-    function Invoke-V2UpdatePreview {
+    function Set-V2PreviewControlsEnabled {
+        param([bool]$Enabled)
+
+        $scanButton.Enabled = $Enabled
+        $previewButton.Enabled = $Enabled
+    }
+
+    function Complete-V2UpdatePreviewIfReady {
+        if (-not $uiState.ScanProcess) {
+            return
+        }
+
+        if (-not $uiState.ScanProcess.HasExited) {
+            $footerLabel.Text = 'Scan is still running...'
+            return
+        }
+
+        $scanTimer.Stop()
+
         try {
-            $footerLabel.Text = 'Scanning Windows Update candidates...'
-            $importantCount.Text = '...'
-            $optionalCount.Text = '...'
-            $driversCount.Text = '...'
-            $form.Refresh()
-
-            Enable-PcnMicrosoftUpdate
-            Test-PcnNetworkReadiness | Out-Null
-            Initialize-PcnWindowsUpdateServices
-
-            $session = New-Object -ComObject Microsoft.Update.Session
-            $searcher = $session.CreateUpdateSearcher()
-            $result = $searcher.Search('IsInstalled=0 and IsHidden=0')
-
-            $important = 0
-            $optional = 0
-            $drivers = 0
-
-            for ($index = 0; $index -lt $result.Updates.Count; $index++) {
-                $update = $result.Updates.Item($index)
-                $typeName = Get-PcnUpdateTypeName -Update $update
-                $isDriver = ($typeName -eq 'Driver')
-                $isOptional = $false
-
-                try {
-                    $isOptional = [bool]$update.BrowseOnly
-                }
-                catch {
-                    $isOptional = $false
-                }
-
-                if ($isDriver) {
-                    $drivers++
-                }
-                elseif ($isOptional) {
-                    $optional++
-                }
-                else {
-                    $important++
-                }
+            $raw = ''
+            if ($uiState.ScanOutPath -and (Test-Path -LiteralPath $uiState.ScanOutPath -PathType Leaf)) {
+                $raw = Get-Content -LiteralPath $uiState.ScanOutPath -Raw -ErrorAction Stop
             }
 
-            $importantCount.Text = [string]$important
-            $optionalCount.Text = [string]$optional
-            $driversCount.Text = [string]$drivers
-            $footerLabel.Text = "Scan complete. Important: $important, Optional: $optional, Drivers: $drivers."
-            Write-PcnWinUpdateLog -Message "V2 preview scan complete. Important: $important, Optional: $optional, Drivers: $drivers." -EventID 1082
+            if ([string]::IsNullOrWhiteSpace($raw)) {
+                $stderr = ''
+                if ($uiState.ScanErrPath -and (Test-Path -LiteralPath $uiState.ScanErrPath -PathType Leaf)) {
+                    $stderr = Get-Content -LiteralPath $uiState.ScanErrPath -Raw -ErrorAction SilentlyContinue
+                }
+
+                throw "Preview scan did not return JSON. $stderr"
+            }
+
+            $scan = $raw | ConvertFrom-Json
+            if (-not [bool]$scan.Success) {
+                throw "Preview scan failed: $($scan.Result)"
+            }
+
+            $importantCount.Text = [string]$scan.Important
+            $optionalCount.Text = [string]$scan.Optional
+            $driversCount.Text = [string]$scan.Drivers
+            $lastScanValue.Text = (Get-Date).ToString('dd-MMM HH:mm')
+            $footerLabel.Text = "Scan complete. Important: $($scan.Important), Optional: $($scan.Optional), Drivers: $($scan.Drivers)."
+            Refresh-V2Status
+            if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
+                Refresh-V2Logs -ScrollToEnd
+            }
         }
         catch {
             $importantCount.Text = '!'
@@ -1135,11 +1167,66 @@ function Show-PcnWinUpdateV2Ui {
             $footerLabel.Text = "Preview scan failed: $($_.Exception.Message)"
             [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
         }
+        finally {
+            Set-V2PreviewControlsEnabled -Enabled $true
+            if ($uiState.ScanProcess) {
+                $uiState.ScanProcess.Dispose()
+            }
+            foreach ($path in @($uiState.ScanOutPath, $uiState.ScanErrPath)) {
+                if ($path -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+                    Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+                }
+            }
+            $uiState.ScanProcess = $null
+            $uiState.ScanOutPath = $null
+            $uiState.ScanErrPath = $null
+        }
+    }
+
+    function Invoke-V2UpdatePreview {
+        if ($uiState.ScanProcess -and -not $uiState.ScanProcess.HasExited) {
+            $footerLabel.Text = 'A scan is already running.'
+            return
+        }
+
+        try {
+            $footerLabel.Text = 'Starting Windows Update scan...'
+            $importantCount.Text = '...'
+            $optionalCount.Text = '...'
+            $driversCount.Text = '...'
+            Set-V2PreviewControlsEnabled -Enabled $false
+
+            $paths = Initialize-PcnWinUpdateFolders
+            $scanId = [guid]::NewGuid().ToString('N')
+            $uiState.ScanOutPath = Join-Path $paths.LogRoot "PreviewScan-$scanId.json"
+            $uiState.ScanErrPath = Join-Path $paths.LogRoot "PreviewScan-$scanId.err"
+            $engineScriptPath = Get-V2MainScriptPath
+            $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode PreviewUpdates -Json' -f $engineScriptPath
+
+            $process = Start-Process -FilePath (Get-PcnPowershellPath) `
+                -ArgumentList $arguments `
+                -WorkingDirectory (Split-Path -Parent $engineScriptPath) `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $uiState.ScanOutPath `
+                -RedirectStandardError $uiState.ScanErrPath `
+                -PassThru
+
+            $uiState.ScanProcess = $process
+            Write-PcnWinUpdateLog -Message "V2 preview scan started. PID: $($process.Id)." -EventID 1085
+            $scanTimer.Start()
+        }
+        catch {
+            Set-V2PreviewControlsEnabled -Enabled $true
+            $importantCount.Text = '!'
+            $optionalCount.Text = '!'
+            $driversCount.Text = '!'
+            $footerLabel.Text = "Preview scan failed to start: $($_.Exception.Message)"
+            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
+        }
     }
 
     function Check-V2ToolUpdateInline {
         try {
-            $toolUpdateHeadline.Text = 'Checking...'
             $toolStatusValue.Text = 'Checking'
             $toolStatusValue.ForeColor = $colors.Orange
             $form.Refresh()
@@ -1149,42 +1236,26 @@ function Show-PcnWinUpdateV2Ui {
             if ($check.Result -eq 'UpdateAvailable') {
                 $toolStatusValue.Text = 'Update'
                 $toolStatusValue.ForeColor = $colors.Purple
-                $toolUpdateHeadline.Text = 'Update available'
-                $toolUpdateHeadline.ForeColor = $colors.Purple
             }
             elseif ($check.Result -eq 'UpToDate') {
                 $toolStatusValue.Text = 'Up to date'
                 $toolStatusValue.ForeColor = $colors.Green
-                $toolUpdateHeadline.Text = 'Up to date'
-                $toolUpdateHeadline.ForeColor = $colors.Green
             }
             else {
                 $toolStatusValue.Text = 'Problem'
                 $toolStatusValue.ForeColor = $colors.Orange
-                $toolUpdateHeadline.Text = 'Manifest problem'
-                $toolUpdateHeadline.ForeColor = $colors.Orange
             }
         }
         catch {
             $latestValueSide.Text = 'Unavailable'
             $toolStatusValue.Text = 'Offline'
             $toolStatusValue.ForeColor = $colors.Orange
-            $toolUpdateHeadline.Text = 'Manifest unavailable'
-            $toolUpdateHeadline.ForeColor = $colors.Orange
         }
     }
 
     $sidebarUpdateButton.Add_Click({ Show-V2ToolUpdateDialog -Owner $form; Check-V2ToolUpdateInline })
-    $toolUpdateButton.Add_Click({ Show-V2ToolUpdateDialog -Owner $form; Check-V2ToolUpdateInline })
-    $settingsButton.Add_Click({ $tabButtons['Schedule'].PerformClick() })
-    $helpButton.Add_Click({ Start-Process -FilePath 'https://www.PcNinja.Pro' | Out-Null })
-    $quickScanButton.Add_Click({ $tabButtons['Updates'].PerformClick(); Invoke-V2UpdatePreview })
-    $quickLogsButton.Add_Click({ $tabButtons['Logs'].PerformClick(); Refresh-V2Logs })
-    $quickResetButton.Add_Click({ Start-V2ResetWindowsUpdate })
-    $dashRunButton.Add_Click({ Start-V2RunUpdates })
-    $dashAuditButton.Add_Click({ Start-V2DriverAudit })
-    $dashLogsButton.Add_Click({ $tabButtons['Logs'].PerformClick(); Refresh-V2Logs })
-    $dashResetButton.Add_Click({ Start-V2ResetWindowsUpdate })
+    $settingsButton.Add_Click({ Show-V2Page -Name 'Schedule' })
+    $helpButton.Add_Click({ Start-Process -FilePath 'https://help.pcninja.pro' | Out-Null })
     $scanButton.Add_Click({ Invoke-V2UpdatePreview })
     $previewButton.Add_Click({ Invoke-V2UpdatePreview })
     $runUpdatesButton.Add_Click({ Start-V2RunUpdates })
@@ -1195,22 +1266,36 @@ function Show-PcnWinUpdateV2Ui {
     $openDriverReportButton.Add_Click({ Open-V2DriverReports })
     $viewFullReportButton.Add_Click({ Open-V2DriverReports })
     $refreshLogsButton.Add_Click({ Refresh-V2Logs })
-    $followLogsButton.Add_Click({ $footerLabel.Text = 'Log follow enabled for this view.' })
+    $followLogsButton.Add_Click({
+        $uiState.LogFollow = -not [bool]$uiState.LogFollow
+        $followLogsButton.Text = if ([bool]$uiState.LogFollow) { 'Following' } else { 'Follow' }
+        $footerLabel.Text = if ([bool]$uiState.LogFollow) { 'Log follow enabled.' } else { 'Log follow paused.' }
+        if ([bool]$uiState.LogFollow) {
+            Refresh-V2Logs -ScrollToEnd
+        }
+    })
     $bottomLogsButton.Add_Click({ $logBox.SelectionStart = $logBox.TextLength; $logBox.ScrollToCaret() })
     $filterBox.Add_TextChanged({ Refresh-V2Logs })
+
+    $form.Add_FormClosed({
+        $smokeTimer.Stop()
+        $logFollowTimer.Stop()
+        $scanTimer.Stop()
+        if ($uiState.ScanProcess) {
+            $uiState.ScanProcess.Dispose()
+            $uiState.ScanProcess = $null
+        }
+    })
 
     $form.Add_Shown({
         Load-V2ScheduleConfig
         Refresh-V2Status
-        Refresh-V2Logs
-        $tabButtons['Dashboard'].PerformClick()
+        Show-V2Page -Name 'Dashboard'
         if ([string]$env:PCNINJA_V2_UI_SMOKE -eq '1') {
             $footerLabel.Text = 'V2 UI smoke test ready.'
             $smokeTimer.Start()
             return
         }
-
-        Check-V2ToolUpdateInline
     })
 
     [void][System.Windows.Forms.Application]::Run($form)

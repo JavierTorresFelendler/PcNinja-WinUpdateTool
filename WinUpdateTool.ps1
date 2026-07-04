@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('UI', 'RunUpdates', 'ShowLog', 'DriverReport', 'DriverAudit', 'Status', 'Configure', 'RunOnceTask', 'CollectLogs', 'ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache', 'AppUpdateCheck', 'AppUpdateDownload', 'AppUpdateInstall')]
+    [ValidateSet('UI', 'RunUpdates', 'PreviewUpdates', 'ShowLog', 'DriverReport', 'DriverAudit', 'Status', 'Configure', 'RunOnceTask', 'CollectLogs', 'ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache', 'AppUpdateCheck', 'AppUpdateDownload', 'AppUpdateInstall')]
     [string]$Mode = 'UI',
 
     [switch]$Silent,
@@ -84,8 +84,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC6'
-        Version = '2.0.5.0'
+        PublicLabel = 'V2.0.0-RC7'
+        Version = '2.0.6.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -605,6 +605,57 @@ function Invoke-PcnAppUpdateInstall {
         ProcessId = $process.Id
         Note = 'The running app should exit after this handoff so MSI can replace files.'
         Download = $download
+        Timestamp = (Get-Date).ToString('s')
+    }
+}
+
+function Invoke-PcnUpdatePreviewScan {
+    Enable-PcnMicrosoftUpdate
+    Test-PcnNetworkReadiness | Out-Null
+    Initialize-PcnWindowsUpdateServices
+
+    $session = New-Object -ComObject Microsoft.Update.Session
+    $searcher = $session.CreateUpdateSearcher()
+    $result = $searcher.Search('IsInstalled=0 and IsHidden=0')
+
+    $important = 0
+    $optional = 0
+    $drivers = 0
+
+    for ($index = 0; $index -lt $result.Updates.Count; $index++) {
+        $update = $result.Updates.Item($index)
+        $typeName = Get-PcnUpdateTypeName -Update $update
+        $isDriver = ($typeName -eq 'Driver')
+        $isOptional = $false
+
+        try {
+            $isOptional = [bool]$update.BrowseOnly
+        }
+        catch {
+            $isOptional = $false
+        }
+
+        if ($isDriver) {
+            $drivers++
+        }
+        elseif ($isOptional) {
+            $optional++
+        }
+        else {
+            $important++
+        }
+    }
+
+    Write-PcnWinUpdateLog -Message "V2 preview scan complete. Important: $important, Optional: $optional, Drivers: $drivers." -EventID 1082
+
+    [pscustomobject]@{
+        Result = 'Succeeded'
+        Success = $true
+        Mode = 'PreviewUpdates'
+        Important = $important
+        Optional = $optional
+        Drivers = $drivers
+        Total = [int]$result.Updates.Count
         Timestamp = (Get-Date).ToString('s')
     }
 }
@@ -1257,6 +1308,16 @@ if (-not (Test-PcnAdministrator)) {
     Stop-PcnCliError -Message "Administrator privileges are required for mode '$Mode'."
 }
 
+if ($Mode -eq 'PreviewUpdates') {
+    try {
+        Write-PcnCliObject -InputObject (Invoke-PcnUpdatePreviewScan) -Depth 8
+        exit 0
+    }
+    catch {
+        Stop-PcnCliError -Message $_.Exception.Message
+    }
+}
+
 if ($Mode -in @('ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache')) {
     try {
         if (-not $ConfirmReset) {
@@ -1603,7 +1664,7 @@ $siteLink.Location = New-Object System.Drawing.Point -ArgumentList ($form.Client
 $siteLink.Anchor = 'Top,Right'
 $siteLink.LinkColor = [System.Drawing.Color]::FromArgb(0, 102, 204)
 $siteLink.Add_LinkClicked({
-    Start-Process 'https://www.PcNinja.Pro' | Out-Null
+    Start-Process 'https://help.pcninja.pro' | Out-Null
 })
 $form.Controls.Add($siteLink)
 

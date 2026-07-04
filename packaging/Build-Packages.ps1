@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.5.0'
+    $Version = '2.0.6.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC6'
+    $PublicLabel = 'V2.0.0-RC7'
 }
 
 if (-not $Repository) {
@@ -559,6 +559,8 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Adds app update check/download/install CLI foundations.',
     '- Adds public update-manifest.json for GitHub Releases.',
     '- Fixes V2 UI manual run, Snooz run, reset, and schedule actions to launch WinUpdateTool.ps1.',
+    '- Simplifies V2 navigation: Settings owns schedule, app update stays in the sidebar, and duplicate quick actions were removed.',
+    '- Adds non-blocking V2 preview scan and live-follow log refresh.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',

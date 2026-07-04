@@ -28,7 +28,7 @@ $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
 $installAssetsDir = Join-Path $installDir 'assets'
 $appIconPath = Join-Path $installAssetsDir 'PcNinja.ico'
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PcNinja WinUpdate Tool'
-$appVersion = '2.0.5.0'
+$appVersion = '2.0.6.0'
 $versionFile = Join-Path $sourceDir 'version.json'
 
 if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
@@ -39,7 +39,7 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
         }
     }
     catch {
-        $appVersion = '2.0.5.0'
+        $appVersion = '2.0.6.0'
     }
 }
 
@@ -113,7 +113,7 @@ New-ItemProperty -LiteralPath $uninstallKey -Name DisplayIcon -Value $appIconPat
 New-ItemProperty -LiteralPath $uninstallKey -Name UninstallString -Value $uninstallCommand -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $uninstallKey -Name QuietUninstallString -Value $quietUninstallCommand -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $uninstallKey -Name URLInfoAbout -Value 'https://www.PcNinja.Pro' -PropertyType String -Force | Out-Null
-New-ItemProperty -LiteralPath $uninstallKey -Name HelpLink -Value 'https://www.PcNinja.Pro' -PropertyType String -Force | Out-Null
+New-ItemProperty -LiteralPath $uninstallKey -Name HelpLink -Value 'https://help.pcninja.pro' -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $uninstallKey -Name InstallDate -Value (Get-Date -Format 'yyyyMMdd') -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $uninstallKey -Name EstimatedSize -Value $estimatedSizeKb -PropertyType DWord -Force | Out-Null
 New-ItemProperty -LiteralPath $uninstallKey -Name NoModify -Value 1 -PropertyType DWord -Force | Out-Null
