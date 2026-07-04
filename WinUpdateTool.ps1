@@ -1188,6 +1188,21 @@ if ($Mode -eq 'AppUpdateCheck') {
     }
 }
 
+if ($Mode -eq 'AppUpdateDownload') {
+    try {
+        $downloadResult = Invoke-PcnAppUpdateDownload -ManifestSource $ManifestUrl -PackageType $UpdatePackageType -CachePath $UpdateCachePath
+        Write-PcnCliObject -InputObject $downloadResult -Depth 12
+        if ($downloadResult.Success) {
+            exit 0
+        }
+
+        exit 1
+    }
+    catch {
+        Stop-PcnCliError -Message $_.Exception.Message
+    }
+}
+
 if ($Mode -in @('DriverReport', 'DriverAudit')) {
     try {
         $report = Export-PcnDriverInventoryReport
@@ -1235,21 +1250,6 @@ if ($Mode -in @('ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache')) {
         Write-PcnCliObject -InputObject $result -Depth 10
 
         if ($result.Result -in @('Succeeded', 'SucceededWithWarnings')) {
-            exit 0
-        }
-
-        exit 1
-    }
-    catch {
-        Stop-PcnCliError -Message $_.Exception.Message
-    }
-}
-
-if ($Mode -eq 'AppUpdateDownload') {
-    try {
-        $downloadResult = Invoke-PcnAppUpdateDownload -ManifestSource $ManifestUrl -PackageType $UpdatePackageType -CachePath $UpdateCachePath
-        Write-PcnCliObject -InputObject $downloadResult -Depth 12
-        if ($downloadResult.Success) {
             exit 0
         }
 
