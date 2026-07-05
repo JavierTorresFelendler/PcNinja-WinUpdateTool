@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -9,13 +9,13 @@ using System.Text;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.0.7.0")]
-[assembly: AssemblyFileVersion("2.0.7.0")]
-[assembly: AssemblyInformationalVersion("V2.0.0-RC8")]
+[assembly: AssemblyVersion("2.0.8.0")]
+[assembly: AssemblyFileVersion("2.0.8.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC9")]
 
 internal static class WinUpdateToolCli
 {
-    private const string Version = "V2.0.0-RC8";
+    private const string Version = "V2.0.0-RC9";
 
     private static int Main(string[] args)
     {

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version,
     [string]$PublicLabel,
     [string]$ReleaseTag,
@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.7.0'
+    $Version = '2.0.8.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC8'
+    $PublicLabel = 'V2.0.0-RC9'
 }
 
 if (-not $Repository) {
@@ -565,6 +565,8 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Restores the V1-style manual update workflow with Windows, optional, driver, and firmware scopes.',
     '- Restores restart handling, Windows Update reset access, and Snooz only when Windows Update is actually busy.',
     '- Adds portable EXE app updates that download the next versioned EXE beside the running portable file.',
+    '- Fixes V2 available-update preview result handling so successful scans do not surface as generic Failed popups.',
+    '- Adds Clear Schedule in V2 Settings and removes all PcNinja WinUpdate Tool scheduled tasks during cleanup.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',

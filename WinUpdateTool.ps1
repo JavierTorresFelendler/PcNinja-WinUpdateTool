@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('UI', 'RunUpdates', 'PreviewUpdates', 'ShowLog', 'DriverReport', 'DriverAudit', 'Status', 'Configure', 'RunOnceTask', 'CollectLogs', 'ResetWindowsUpdate', 'ResetWinUpdate', 'ResetUpdateCache', 'AppUpdateCheck', 'AppUpdateDownload', 'AppUpdateInstall')]
     [string]$Mode = 'UI',
 
@@ -92,8 +92,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC8'
-        Version = '2.0.7.0'
+        PublicLabel = 'V2.0.0-RC9'
+        Version = '2.0.8.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -803,7 +803,7 @@ function Invoke-PcnUpdatePreviewScan {
             Type = Get-PcnUpdateTypeName -Update $update
             Scope = $scopeKind
             Kb = Convert-PcnUpdateKbList -Update $update
-            Sources = @($entry.Sources)
+            Sources = @(@($entry.Sources) | ForEach-Object { [string]$_ })
             Firmware = $isFirmware
             Included = $included
         }) | Out-Null
@@ -1279,7 +1279,7 @@ function Set-PcnCliConfiguration {
         $scheduleAction = 'Registered'
     }
     elseif ($DisableSchedule -or $changed.Contains('Enabled')) {
-        Unregister-PcnWinUpdateScheduledTask
+        Unregister-PcnWinUpdateToolTasks | Out-Null
         $scheduleAction = 'Removed'
     }
 
@@ -4193,8 +4193,7 @@ $saveSchedule.Add_Click({
 
 $removeSchedule.Add_Click({
     try {
-        Unregister-PcnWinUpdateScheduledTask
-        Unregister-PcnWinUpdateRetryTask
+        Unregister-PcnWinUpdateToolTasks | Out-Null
         $config = Get-PcnUiConfig
         $config.Enabled = $false
         Save-PcnWinUpdateConfig -Config $config

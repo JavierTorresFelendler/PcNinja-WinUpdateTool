@@ -911,8 +911,9 @@ function Show-PcnWinUpdateV2Ui {
     $nextModeValue = New-V2Label -Text 'Schedule disabled' -X 20 -Y 82 -Width 360 -Height 24 -ForeColor $colors.Muted
     $nextCard.Controls.AddRange([System.Windows.Forms.Control[]]@($nextRunValue, $nextModeValue))
     $schedule.Controls.Add($nextCard)
+    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 390 -Y 392 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
     $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 625 -Y 392 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
-    $schedule.Controls.Add($saveScheduleButton)
+    $schedule.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton))
 
     $drivers = $pages['Drivers']
     $auditCard = New-V2Card -X 0 -Y 0 -Width 420 -Height 175 -Title 'Driver Audit'
@@ -1131,6 +1132,45 @@ function Show-PcnWinUpdateV2Ui {
         }
         catch {
             [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Schedule Error', 'OK', 'Error') | Out-Null
+        }
+    }
+
+    function Clear-V2Schedule {
+        $answer = [System.Windows.Forms.MessageBox]::Show(
+            "Clear the saved schedule and remove PcNinja WinUpdate Tool scheduled tasks?`r`n`r`nThe PcNinja Task Scheduler folder may remain, but this tool's schedule, retry, and run-once tasks will be removed.",
+            'Clear Schedule',
+            'YesNo',
+            'Warning'
+        )
+
+        if ($answer -ne 'Yes') {
+            return
+        }
+
+        try {
+            $cleanup = Unregister-PcnWinUpdateToolTasks
+            $config = Get-PcnWinUpdateConfig
+            $config.Enabled = $false
+            $config.RunAtStartup = $false
+            Save-PcnWinUpdateConfig -Config $config
+
+            $state = Get-PcnWinUpdateState
+            $state.LastRetryScheduled = $null
+            $state.LastRetryReason = $null
+            $state.RetryCount = 0
+            Save-PcnWinUpdateState -State $state
+
+            $dailyRadio.Checked = $true
+            $startupCheck.Checked = $false
+            $footerLabel.Text = "Schedule cleared. Removed task(s): $(@($cleanup.Removed).Count)."
+            Load-V2ScheduleConfig
+            Refresh-V2Status
+            if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
+                Refresh-V2Logs -ScrollToEnd
+            }
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Clear Schedule Error', 'OK', 'Error') | Out-Null
         }
     }
 
@@ -1515,8 +1555,36 @@ function Show-PcnWinUpdateV2Ui {
             }
 
             $scan = $raw | ConvertFrom-Json
-            if (-not [bool]$scan.Success) {
-                throw "Preview scan failed: $($scan.Result)"
+            $scanSucceeded = $false
+            if ($scan.PSObject.Properties['Success']) {
+                $scanSucceeded = [bool]$scan.Success
+            }
+            elseif ($scan.PSObject.Properties['Result']) {
+                $scanSucceeded = ([string]$scan.Result -eq 'Succeeded')
+            }
+
+            if (-not $scanSucceeded) {
+                $failureText = if ($scan.PSObject.Properties['Message'] -and -not [string]::IsNullOrWhiteSpace([string]$scan.Message)) {
+                    [string]$scan.Message
+                }
+                elseif ($scan.PSObject.Properties['Errors'] -and @($scan.Errors).Count -gt 0) {
+                    @($scan.Errors) -join '; '
+                }
+                elseif ($scan.PSObject.Properties['Result']) {
+                    [string]$scan.Result
+                }
+                else {
+                    'Unknown preview scan failure.'
+                }
+
+                if ($uiState.ScanErrPath -and (Test-Path -LiteralPath $uiState.ScanErrPath -PathType Leaf)) {
+                    $stderrText = Get-Content -LiteralPath $uiState.ScanErrPath -Raw -ErrorAction SilentlyContinue
+                    if (-not [string]::IsNullOrWhiteSpace($stderrText)) {
+                        $failureText = "$failureText $stderrText"
+                    }
+                }
+
+                throw "Preview scan failed: $failureText"
             }
 
             $importantCount.Text = [string]$scan.Important
@@ -1657,6 +1725,7 @@ function Show-PcnWinUpdateV2Ui {
     })
     $restartDetailsButton.Add_Click({ [System.Windows.Forms.MessageBox]::Show((Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot), 'Restart State', 'OK', 'Information') | Out-Null })
     $dashboardResetButton.Add_Click({ Start-V2ResetWindowsUpdate })
+    $clearScheduleButton.Add_Click({ Clear-V2Schedule })
     $saveScheduleButton.Add_Click({ Save-V2Schedule })
     $driverAuditButton.Add_Click({ Start-V2DriverAudit })
     $openDriverReportButton.Add_Click({ Open-V2DriverReports })

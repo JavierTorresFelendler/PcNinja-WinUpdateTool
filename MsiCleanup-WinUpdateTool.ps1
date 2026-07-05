@@ -14,19 +14,24 @@ function Remove-EmptyDirectory {
     }
 }
 
-foreach ($taskName in @(
+$pcnWinUpdateTaskNames = @(
     'PcNinja WinUpdate Tool',
     'PcNinja WinUpdate Tool Retry',
     'PcNinja WinUpdate Tool Run Once'
-)) {
-    Unregister-ScheduledTask -TaskName $taskName -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction SilentlyContinue
-}
+)
 
 try {
-    $scheduleService = New-Object -ComObject Schedule.Service
-    $scheduleService.Connect()
-    $rootFolder = $scheduleService.GetFolder('\')
-    $rootFolder.DeleteFolder('PcNinja', 0)
+    $tasks = @(Get-ScheduledTask -TaskPath '\PcNinja\' -ErrorAction SilentlyContinue | Where-Object {
+        $pcnWinUpdateTaskNames -contains $_.TaskName -or $_.TaskName -like 'PcNinja WinUpdate Tool*'
+    })
+
+    foreach ($task in $tasks) {
+        Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction SilentlyContinue
+    }
+
+    foreach ($taskName in $pcnWinUpdateTaskNames) {
+        Unregister-ScheduledTask -TaskName $taskName -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction SilentlyContinue
+    }
 }
 catch {
     $null = $_

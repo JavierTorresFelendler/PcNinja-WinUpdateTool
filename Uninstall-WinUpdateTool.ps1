@@ -37,39 +37,30 @@ function Remove-EmptyDirectory {
     }
 }
 
-try {
-    Unregister-ScheduledTask -TaskName 'PcNinja WinUpdate Tool' -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction Stop
-    Write-Host 'Scheduled task removed.'
-}
-catch {
-    Write-Host 'Scheduled task was not present.'
-}
+$pcnWinUpdateTaskNames = @(
+    'PcNinja WinUpdate Tool',
+    'PcNinja WinUpdate Tool Retry',
+    'PcNinja WinUpdate Tool Run Once'
+)
 
 try {
-    Unregister-ScheduledTask -TaskName 'PcNinja WinUpdate Tool Retry' -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction Stop
-    Write-Host 'Retry task removed.'
-}
-catch {
-    Write-Host 'Retry task was not present.'
-}
+    $tasks = @(Get-ScheduledTask -TaskPath '\PcNinja\' -ErrorAction SilentlyContinue | Where-Object {
+        $pcnWinUpdateTaskNames -contains $_.TaskName -or $_.TaskName -like 'PcNinja WinUpdate Tool*'
+    })
 
-try {
-    Unregister-ScheduledTask -TaskName 'PcNinja WinUpdate Tool Run Once' -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction Stop
-    Write-Host 'Run-once task removed.'
-}
-catch {
-    Write-Host 'Run-once task was not present.'
-}
+    foreach ($task in $tasks) {
+        Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction SilentlyContinue
+        Write-Host "Scheduled task removed: $($task.TaskName)"
+    }
 
-try {
-    $scheduleService = New-Object -ComObject Schedule.Service
-    $scheduleService.Connect()
-    $rootFolder = $scheduleService.GetFolder('\')
-    $rootFolder.DeleteFolder('PcNinja', 0)
-    Write-Host 'Scheduled task folder removed.'
+    foreach ($taskName in $pcnWinUpdateTaskNames) {
+        if (-not ($tasks | Where-Object { $_.TaskName -eq $taskName })) {
+            Unregister-ScheduledTask -TaskName $taskName -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction SilentlyContinue
+        }
+    }
 }
 catch {
-    Write-Host 'Scheduled task folder was not present or was not empty.'
+    Write-Host "Scheduled task cleanup warning: $($_.Exception.Message)"
 }
 
 foreach ($path in @($startMenuShortcut, $desktopShortcut)) {

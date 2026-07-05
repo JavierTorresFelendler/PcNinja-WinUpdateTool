@@ -528,7 +528,7 @@ C:\ProgramData\PcNinja\WinUpdateTool\DriverReports
 
 Important: `UpdateCandidate` in the report means the device is useful for vendor-driver comparison. It does not mean the installed driver is outdated.
 
-## New In RC8.1
+## New In RC9
 
 - Fixes a PowerShell collection unwrapping issue that could stop the run after discovery with: `The property 'Count' cannot be found on this object`.
 

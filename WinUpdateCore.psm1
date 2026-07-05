@@ -8,6 +8,14 @@ $script:PcnRunOnceTaskName = 'PcNinja WinUpdate Tool Run Once'
 $script:PcnTaskPath = '\PcNinja\'
 $script:PcnConsoleLogEnabled = $true
 
+function Get-PcnWinUpdateTaskNames {
+    @(
+        $script:PcnTaskName,
+        $script:PcnRetryTaskName,
+        $script:PcnRunOnceTaskName
+    )
+}
+
 function Test-PcnAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -1294,6 +1302,49 @@ function Unregister-PcnWinUpdateRetryTask {
     }
     catch {
         $null = $_
+    }
+}
+
+function Unregister-PcnWinUpdateToolTasks {
+    if (-not (Test-PcnAdministrator)) {
+        throw 'Administrator privileges are required to remove PcNinja WinUpdate Tool scheduled tasks.'
+    }
+
+    $knownNames = @(Get-PcnWinUpdateTaskNames)
+    $tasks = @()
+
+    try {
+        $tasks = @(Get-ScheduledTask -TaskPath $script:PcnTaskPath -ErrorAction Stop | Where-Object {
+            $knownNames -contains $_.TaskName -or $_.TaskName -like "$($script:PcnTaskName)*"
+        })
+    }
+    catch {
+        $tasks = @()
+    }
+
+    $removed = New-Object System.Collections.Generic.List[object]
+    $warnings = New-Object System.Collections.Generic.List[string]
+
+    foreach ($task in @($tasks | Sort-Object TaskName -Unique)) {
+        try {
+            Unregister-ScheduledTask -TaskName ([string]$task.TaskName) -TaskPath $script:PcnTaskPath -Confirm:$false -ErrorAction Stop
+            $removed.Add([pscustomobject]@{
+                TaskName = [string]$task.TaskName
+                TaskPath = $script:PcnTaskPath
+            }) | Out-Null
+            Write-PcnWinUpdateLog -Message "Scheduled task removed: $($task.TaskName)." -EventID 1043
+        }
+        catch {
+            $message = "Scheduled task was not removed: $($task.TaskName). $($_.Exception.Message)"
+            $warnings.Add($message) | Out-Null
+            Write-PcnWinUpdateLog -Message $message -EntryType Warning -EventID 1044
+        }
+    }
+
+    [pscustomobject]@{
+        Result = if ($warnings.Count -eq 0) { 'Removed' } else { 'RemovedWithWarnings' }
+        Removed = @($removed.ToArray())
+        Warnings = @($warnings.ToArray())
     }
 }
 
@@ -3373,6 +3424,8 @@ Export-ModuleMember -Function `
     New-PcnRunLock, `
     Remove-PcnRunLock, `
     Get-PcnRetryDelayMinutes, `
+    Get-PcnWinUpdateTaskNames, `
+    Unregister-PcnWinUpdateToolTasks, `
     New-PcnScheduledTaskXml, `
     Register-PcnWinUpdateRetryTask, `
     Unregister-PcnWinUpdateRetryTask, `
