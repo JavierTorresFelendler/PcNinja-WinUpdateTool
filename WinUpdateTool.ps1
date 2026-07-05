@@ -86,14 +86,21 @@
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Json) {
+    $WarningPreference = 'SilentlyContinue'
+    $InformationPreference = 'SilentlyContinue'
+    $ProgressPreference = 'SilentlyContinue'
+    $VerbosePreference = 'SilentlyContinue'
+}
+
 $modulePath = Join-Path $PSScriptRoot 'WinUpdateCore.psm1'
 Import-Module $modulePath -Force
 
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC9'
-        Version = '2.0.8.0'
+        PublicLabel = 'V2.0.0-RC10'
+        Version = '2.0.9.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }

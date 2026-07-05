@@ -1519,6 +1519,45 @@ function Show-PcnWinUpdateV2Ui {
         $dialog.ShowDialog($form) | Out-Null
     }
 
+    function ConvertFrom-V2ProcessJsonOutput {
+        param(
+            [AllowNull()]
+            [string]$RawOutput,
+
+            [string]$Context = 'background process'
+        )
+
+        $text = ([string]$RawOutput).TrimStart([char]0xFEFF).Trim()
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            throw "$Context did not return JSON."
+        }
+
+        try {
+            return ($text | ConvertFrom-Json)
+        }
+        catch {
+            $start = $text.IndexOf('{')
+            $end = $text.LastIndexOf('}')
+            if ($start -ge 0 -and $end -gt $start) {
+                $candidate = $text.Substring($start, ($end - $start + 1))
+                try {
+                    Write-PcnWinUpdateLog -Message "$Context returned non-JSON stream text before/after JSON. Ignoring stream noise for UI parse." -EntryType Warning -EventID 1096
+                    return ($candidate | ConvertFrom-Json)
+                }
+                catch {
+                    $null = $_
+                }
+            }
+
+            $sample = $text
+            if ($sample.Length -gt 400) {
+                $sample = $sample.Substring(0, 400) + '...'
+            }
+
+            throw "$Context returned invalid JSON. First output: $sample"
+        }
+    }
+
     function Set-V2PreviewControlsEnabled {
         param([bool]$Enabled)
 
@@ -1554,7 +1593,7 @@ function Show-PcnWinUpdateV2Ui {
                 throw "Preview scan did not return JSON. $stderr"
             }
 
-            $scan = $raw | ConvertFrom-Json
+            $scan = ConvertFrom-V2ProcessJsonOutput -RawOutput $raw -Context 'Preview scan'
             $scanSucceeded = $false
             if ($scan.PSObject.Properties['Success']) {
                 $scanSucceeded = [bool]$scan.Success
