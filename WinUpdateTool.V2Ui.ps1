@@ -1038,8 +1038,19 @@ function Show-PcnWinUpdateV2Ui {
 
             if ([bool]$config.Enabled) {
                 $next = Get-PcnScheduledTaskStatus
-                if ($next.Installed) {
+                $taskInstalled = $false
+                if ($next.PSObject.Properties['Installed']) {
+                    $taskInstalled = [bool]$next.Installed
+                }
+                elseif ($next.PSObject.Properties['Exists']) {
+                    $taskInstalled = [bool]$next.Exists
+                }
+
+                if ($taskInstalled) {
                     $nextRunText = Format-V2Date -Value $next.NextRunTime
+                    if ($nextRunText -eq 'Not yet') {
+                        $nextRunText = 'Installed'
+                    }
                     $startupText = if ([bool]$config.RunAtStartup) { " + startup delay $($config.StartupDelayMinutes)m" } else { '' }
                     $scheduleSummaryText.Text = "Next run: $nextRunText`r`nMode: $($config.Frequency) at $($config.Time)$startupText"
                     $nextRunValue.Text = $nextRunText

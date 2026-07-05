@@ -1460,28 +1460,40 @@ function Get-PcnScheduledTaskStatusByName {
 
     try {
         $task = Get-ScheduledTask -TaskName $TaskName -TaskPath $script:PcnTaskPath -ErrorAction Stop
-        $info = $task | Get-ScheduledTaskInfo
-
-        [pscustomobject]@{
-            Exists = $true
-            TaskName = $TaskName
-            TaskPath = $script:PcnTaskPath
-            State = $task.State
-            LastRunTime = $info.LastRunTime
-            NextRunTime = $info.NextRunTime
-            LastTaskResult = $info.LastTaskResult
-        }
     }
     catch {
-        [pscustomobject]@{
+        return [pscustomobject]@{
             Exists = $false
+            Installed = $false
             TaskName = $TaskName
             TaskPath = $script:PcnTaskPath
             State = 'Not installed'
             LastRunTime = $null
             NextRunTime = $null
             LastTaskResult = $null
+            Warning = $_.Exception.Message
         }
+    }
+
+    $info = $null
+    $warning = $null
+    try {
+        $info = $task | Get-ScheduledTaskInfo -ErrorAction Stop
+    }
+    catch {
+        $warning = $_.Exception.Message
+    }
+
+    [pscustomobject]@{
+        Exists = $true
+        Installed = $true
+        TaskName = $TaskName
+        TaskPath = $script:PcnTaskPath
+        State = $task.State
+        LastRunTime = if ($info) { $info.LastRunTime } else { $null }
+        NextRunTime = if ($info) { $info.NextRunTime } else { $null }
+        LastTaskResult = if ($info) { $info.LastTaskResult } else { $null }
+        Warning = $warning
     }
 }
 

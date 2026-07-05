@@ -99,8 +99,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC10'
-        Version = '2.0.9.0'
+        PublicLabel = 'V2.0.0-RC11'
+        Version = '2.0.10.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -831,7 +831,7 @@ function Invoke-PcnUpdatePreviewScan {
         Total = ($important + $optional + $drivers)
         TotalDiscovered = [int]$mergedUpdates.Count
         Scope = $scope
-        Items = @($items)
+        Items = @($items.ToArray())
         Timestamp = (Get-Date).ToString('s')
     }
 }
@@ -4519,3 +4519,4 @@ catch {
 
     exit 1
 }
+
