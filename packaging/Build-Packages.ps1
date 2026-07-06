@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.10.0'
+    $Version = '2.0.11.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC11'
+    $PublicLabel = 'V2.0.0-RC12'
 }
 
 if (-not $Repository) {
@@ -565,6 +565,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Restores the V1-style manual update workflow with Windows, optional, driver, and firmware scopes.',
     '- Restores restart handling, Windows Update reset access, and Snooz only when Windows Update is actually busy.',
     '- Adds portable EXE app updates that download the next versioned EXE beside the running portable file.',
+    '- Hardens CLI JSON output for Windows PowerShell 5.1 and removes generic object lists from V2 preview output.',
     '- Fixes V2 available-update preview serialization when Windows Update returns real update candidates.',
     '- Fixes the V2 schedule summary falsely showing Task not installed after a schedule is saved.',
     '- Fixes V2 available-update preview result handling so successful scans do not surface as generic Failed popups.',
@@ -627,4 +628,5 @@ Set-Content -LiteralPath ($publicZipPath + '.sha256.txt') -Value ("{0}  {1}" -f 
 
 Get-FileHash -LiteralPath $msiPath, $portableExePath, $hostExePath, $cliExePath, $publicMsiPath, $publicPortablePath, $publicZipPath -Algorithm SHA256 |
     Select-Object Algorithm, Hash, Path
+
 

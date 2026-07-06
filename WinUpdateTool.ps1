@@ -99,8 +99,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC11'
-        Version = '2.0.10.0'
+        PublicLabel = 'V2.0.0-RC12'
+        Version = '2.0.11.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -143,6 +143,84 @@ function Test-PcnCliParameter {
     return $script:PcnCliBoundParameters.ContainsKey($Name)
 }
 
+function ConvertTo-PcnCliJsonSafeValue {
+    param(
+        [AllowNull()]
+        [object]$Value,
+
+        [int]$CurrentDepth = 0,
+
+        [int]$MaxDepth = 12
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($CurrentDepth -ge $MaxDepth) {
+        return [string]$Value
+    }
+
+    if ($Value -is [string] -or
+        $Value -is [char] -or
+        $Value -is [bool] -or
+        $Value -is [byte] -or
+        $Value -is [int16] -or
+        $Value -is [int] -or
+        $Value -is [int64] -or
+        $Value -is [single] -or
+        $Value -is [double] -or
+        $Value -is [decimal]) {
+        return $Value
+    }
+
+    if ($Value -is [datetime]) {
+        return $Value.ToString('s')
+    }
+
+    if ($Value -is [System.Enum]) {
+        return [string]$Value
+    }
+
+    if ($Value -is [System.Collections.IDictionary]) {
+        $hash = [ordered]@{}
+        foreach ($key in $Value.Keys) {
+            $hash[[string]$key] = ConvertTo-PcnCliJsonSafeValue -Value $Value[$key] -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth
+        }
+
+        return [pscustomobject]$hash
+    }
+
+    if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+        $items = New-Object System.Collections.ArrayList
+        foreach ($item in $Value) {
+            $null = $items.Add((ConvertTo-PcnCliJsonSafeValue -Value $item -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth))
+        }
+
+        return @($items.ToArray())
+    }
+
+    $properties = @($Value.PSObject.Properties | Where-Object {
+        $_.MemberType -in @('NoteProperty', 'Property', 'ScriptProperty')
+    })
+
+    if ($properties.Count -gt 0) {
+        $object = [ordered]@{}
+        foreach ($property in $properties) {
+            try {
+                $object[$property.Name] = ConvertTo-PcnCliJsonSafeValue -Value $property.Value -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth
+            }
+            catch {
+                $object[$property.Name] = "Unavailable: $($_.Exception.Message)"
+            }
+        }
+
+        return [pscustomobject]$object
+    }
+
+    return [string]$Value
+}
+
 function Write-PcnCliObject {
     param(
         [Parameter(Mandatory = $true)]
@@ -152,7 +230,8 @@ function Write-PcnCliObject {
     )
 
     if ($Json) {
-        $InputObject | ConvertTo-Json -Depth $Depth
+        $safeInputObject = ConvertTo-PcnCliJsonSafeValue -Value $InputObject -MaxDepth $Depth
+        ConvertTo-Json -InputObject $safeInputObject -Depth $Depth
         return
     }
 
@@ -772,7 +851,7 @@ function Invoke-PcnUpdatePreviewScan {
     $firmwareSkipped = 0
     $firmwareIncluded = 0
     $scopeSkipped = 0
-    $items = New-Object System.Collections.Generic.List[object]
+    $items = @()
 
     foreach ($entry in $mergedUpdates) {
         $update = $entry.Update
@@ -805,15 +884,20 @@ function Invoke-PcnUpdatePreviewScan {
             }
         }
 
-        $items.Add([pscustomobject]@{
+        $sourceItems = @()
+        foreach ($source in $entry.Sources) {
+            $sourceItems += [string]$source
+        }
+
+        $items += [pscustomobject]@{
             Title = [string]$update.Title
             Type = Get-PcnUpdateTypeName -Update $update
             Scope = $scopeKind
             Kb = Convert-PcnUpdateKbList -Update $update
-            Sources = @(@($entry.Sources) | ForEach-Object { [string]$_ })
+            Sources = @($sourceItems)
             Firmware = $isFirmware
             Included = $included
-        }) | Out-Null
+        }
     }
 
     Write-PcnWinUpdateLog -Message "V2 available update check complete. Scope: $(Get-PcnUpdateScopeSummary -Scope $scope). Important: $important, Optional: $optional, Drivers: $drivers, Firmware skipped: $firmwareSkipped, Scope skipped: $scopeSkipped." -EventID 1082
@@ -831,7 +915,7 @@ function Invoke-PcnUpdatePreviewScan {
         Total = ($important + $optional + $drivers)
         TotalDiscovered = [int]$mergedUpdates.Count
         Scope = $scope
-        Items = @($items.ToArray())
+        Items = @($items)
         Timestamp = (Get-Date).ToString('s')
     }
 }
@@ -1501,6 +1585,7 @@ if ($Mode -eq 'PreviewUpdates') {
         exit 0
     }
     catch {
+        Write-PcnWinUpdateLog -Message "PreviewUpdates failed: $($_.Exception.Message) $($_.InvocationInfo.PositionMessage)" -EntryType Error -EventID 1097
         Stop-PcnCliError -Message $_.Exception.Message
     }
 }
@@ -4519,4 +4604,5 @@ catch {
 
     exit 1
 }
+
 
