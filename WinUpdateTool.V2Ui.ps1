@@ -694,6 +694,7 @@ function Show-PcnWinUpdateV2Ui {
         $page = New-Object System.Windows.Forms.Panel
         $page.BackColor = $colors.AppBack
         $page.Dock = 'Fill'
+        $page.AutoScroll = $true
         $page.Visible = $false
         $content.Controls.Add($page)
         $pages[$name] = $page
@@ -1165,6 +1166,171 @@ function Show-PcnWinUpdateV2Ui {
         }
         catch {
             $logBox.Text = "Could not load logs: $($_.Exception.Message)"
+        }
+    }
+
+    function Set-V2ControlBounds {
+        param(
+            [Parameter(Mandatory = $true)]
+            [System.Windows.Forms.Control]$Control,
+
+            [int]$X,
+            [int]$Y,
+            [int]$Width,
+            [int]$Height
+        )
+
+        $Control.Location = New-V2Point $X $Y
+        $Control.Size = New-V2Size ([Math]::Max(1, $Width)) ([Math]::Max(1, $Height))
+    }
+
+    function Set-V2ResponsiveLayout {
+        $pageW = [Math]::Max(650, $content.ClientSize.Width)
+        $pageH = [Math]::Max(470, $content.ClientSize.Height)
+
+        $tabCount = [Math]::Max(1, $tabButtons.Count)
+        $tabW = [Math]::Max(130, [int][Math]::Floor($tabHost.ClientSize.Width / $tabCount))
+        $tabX = 0
+        foreach ($tabName in @('Dashboard', 'Updates', 'Drivers', 'Logs')) {
+            if ($tabButtons.ContainsKey($tabName)) {
+                Set-V2ControlBounds -Control $tabButtons[$tabName] -X $tabX -Y 0 -Width $tabW -Height 42
+                $tabX += $tabW
+            }
+        }
+
+        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 44 -Width $pageW -Height 150
+        if ($pageW -ge 760) {
+            $halfW = [int][Math]::Floor(($pageW - 16) / 2)
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 210 -Width $halfW -Height 150
+            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 210 -Width ($pageW - $halfW - 16) -Height 150
+        }
+        else {
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 210 -Width $pageW -Height 130
+            Set-V2ControlBounds -Control $healthCard -X 0 -Y 356 -Width $pageW -Height 130
+        }
+        Set-V2ControlBounds -Control $repairCard -X 0 -Y 502 -Width $pageW -Height 112
+        Set-V2ControlBounds -Control $dashboardResetButton -X ([Math]::Max(20, $repairCard.Width - 230)) -Y 42 -Width 190 -Height 36
+
+        Set-V2ControlBounds -Control $manualCard -X 0 -Y 0 -Width $pageW -Height 190
+        Set-V2ControlBounds -Control $checkAvailableButton -X ([Math]::Max(20, $pageW - 476)) -Y 136 -Width 210 -Height 38
+        Set-V2ControlBounds -Control $installSelectedButton -X ([Math]::Max(240, $pageW - 250)) -Y 136 -Width 220 -Height 38
+        Set-V2ControlBounds -Control $availableCard -X 0 -Y 206 -Width $pageW -Height 120
+        Set-V2ControlBounds -Control $restartCard -X 0 -Y 342 -Width $pageW -Height 90
+        Set-V2ControlBounds -Control $restartLabel -X 20 -Y 48 -Width ([Math]::Max(260, $pageW - 310)) -Height 24
+        Set-V2ControlBounds -Control $restartNowButton -X ([Math]::Max(20, $pageW - 260)) -Y 42 -Width 112 -Height 32
+        Set-V2ControlBounds -Control $restartDetailsButton -X ([Math]::Max(140, $pageW - 130)) -Y 42 -Width 100 -Height 32
+        Set-V2ControlBounds -Control $linksCard -X 0 -Y 448 -Width $pageW -Height 95
+
+        if ($pageW -lt 820) {
+            $nextCard.Visible = $false
+            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 160
+            Set-V2ControlBounds -Control $scheduleTimeCombo -X ([Math]::Max(170, $pageW - 190)) -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
+            Set-V2ControlBounds -Control $scheduleDayCombo -X ([Math]::Max(170, $pageW - 190)) -Y 92 -Width 145 -Height $scheduleDayCombo.Height
+            Set-V2ControlBounds -Control $scheduleMonthDayCombo -X ([Math]::Max(170, $pageW - 190)) -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
+            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 176 -Width $pageW -Height 96
+            Set-V2ControlBounds -Control $startupCheck -X 20 -Y 36 -Width 230 -Height 24
+            Set-V2ControlBounds -Control $startupDelayLabel -X ([Math]::Max(275, $pageW - 235)) -Y 36 -Width 96 -Height 24
+            Set-V2ControlBounds -Control $startupDelayCombo -X ([Math]::Max(380, $pageW - 125)) -Y 32 -Width 72 -Height $startupDelayCombo.Height
+            Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 68 -Width 300 -Height 24
+            Set-V2ControlBounds -Control $missedCheck -X ([Math]::Max(360, $pageW - 300)) -Y 68 -Width 260 -Height 24
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 288 -Width $pageW -Height 128
+            Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
+            Set-V2ControlBounds -Control $retryIntervalCombo -X ([Math]::Min(448, [Math]::Max(168, $pageW - 235))) -Y 70 -Width 145 -Height $retryIntervalCombo.Height
+            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 96 -Width ([Math]::Min(210, $pageW - 188)) -Height $retryFailureCombo.Height
+            foreach ($ctrl in $retryCard.Controls) {
+                if ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry failed updates') {
+                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 74 -Width 145 -Height 24
+                }
+                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'On repeated failure') {
+                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 100 -Width 135 -Height 24
+                }
+                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry interval') {
+                    Set-V2ControlBounds -Control $ctrl -X ([Math]::Min(340, [Math]::Max(20, $pageW - 345))) -Y 74 -Width 105 -Height 24
+                }
+            }
+            $buttonY = [Math]::Min(($pageH - 48), 432)
+            Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 455)) -Y $buttonY -Width 210 -Height 38
+            Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(240, $pageW - 225)) -Y $buttonY -Width 210 -Height 38
+        }
+        else {
+            $nextCard.Visible = $true
+            $leftW = [Math]::Min(640, [Math]::Max(520, $pageW - 330))
+            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $leftW -Height 220
+            Set-V2ControlBounds -Control $scheduleTimeCombo -X 230 -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
+            Set-V2ControlBounds -Control $scheduleDayCombo -X 230 -Y 92 -Width 145 -Height $scheduleDayCombo.Height
+            Set-V2ControlBounds -Control $scheduleMonthDayCombo -X 230 -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
+            Set-V2ControlBounds -Control $nextCard -X ($leftW + 20) -Y 0 -Width ($pageW - $leftW - 20) -Height 220
+            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 238 -Width $pageW -Height 118
+            Set-V2ControlBounds -Control $startupCheck -X 20 -Y 42 -Width 230 -Height 24
+            Set-V2ControlBounds -Control $startupDelayLabel -X 310 -Y 40 -Width 98 -Height 24
+            Set-V2ControlBounds -Control $startupDelayCombo -X 414 -Y 36 -Width 72 -Height $startupDelayCombo.Height
+            Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 78 -Width 300 -Height 24
+            Set-V2ControlBounds -Control $missedCheck -X 414 -Y 78 -Width 260 -Height 24
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 374 -Width $pageW -Height 110
+            Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
+            Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
+            Set-V2ControlBounds -Control $retryFailureCombo -X ([Math]::Max(704, $pageW - 166)) -Y 70 -Width 144 -Height $retryFailureCombo.Height
+            foreach ($ctrl in $retryCard.Controls) {
+                if ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry failed updates') {
+                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 74 -Width 145 -Height 24
+                }
+                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry interval') {
+                    Set-V2ControlBounds -Control $ctrl -X 340 -Y 74 -Width 105 -Height 24
+                }
+                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'On repeated failure') {
+                    Set-V2ControlBounds -Control $ctrl -X ([Math]::Max(565, $pageW - 305)) -Y 74 -Width 135 -Height 24
+                }
+            }
+            $buttonY = [Math]::Max(506, $pageH - 50)
+            Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 480)) -Y $buttonY -Width 220 -Height 40
+            Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(250, $pageW - 240)) -Y $buttonY -Width 220 -Height 40
+        }
+
+        if ($pageW -lt 840) {
+            Set-V2ControlBounds -Control $auditCard -X 0 -Y 0 -Width $pageW -Height 260
+            Set-V2ControlBounds -Control $auditDivider -X 20 -Y 144 -Width ($pageW - 40) -Height 1
+            foreach ($ctrl in $auditCard.Controls) {
+                if ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Latest Report') {
+                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 154 -Width 260 -Height 26
+                }
+            }
+            Set-V2ControlBounds -Control $reportSummary -X 20 -Y 184 -Width 260 -Height 64
+            Set-V2ControlBounds -Control $viewFullReportButton -X ([Math]::Max(300, $pageW - 170)) -Y 192 -Width 140 -Height 32
+            Set-V2ControlBounds -Control $toolsCard -X 0 -Y 276 -Width $pageW -Height 158
+            Set-V2ControlBounds -Control $pcnDriverLink -X 20 -Y 78 -Width 225 -Height 24
+            Set-V2ControlBounds -Control $pcnOfficeLink -X 20 -Y 110 -Width 225 -Height 24
+            Set-V2ControlBounds -Control $pcnActivationLink -X 270 -Y 78 -Width 205 -Height 24
+            Set-V2ControlBounds -Control $pcnWindowsLink -X 270 -Y 110 -Width 205 -Height 24
+            Set-V2ControlBounds -Control $passwordBox -X ([Math]::Max(20, $pageW - 220)) -Y 88 -Width 190 -Height 28
+            Set-V2ControlBounds -Control $sourcesCard -X 0 -Y 450 -Width $pageW -Height 150
+        }
+        else {
+            Set-V2ControlBounds -Control $auditCard -X 0 -Y 0 -Width $pageW -Height 168
+            Set-V2ControlBounds -Control $auditDivider -X 488 -Y 22 -Width 1 -Height 122
+            foreach ($ctrl in $auditCard.Controls) {
+                if ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Latest Report') {
+                    Set-V2ControlBounds -Control $ctrl -X 520 -Y 12 -Width 300 -Height 26
+                }
+            }
+            Set-V2ControlBounds -Control $reportSummary -X 520 -Y 50 -Width 175 -Height 92
+            Set-V2ControlBounds -Control $viewFullReportButton -X ([Math]::Max(710, $pageW - 160)) -Y 96 -Width 140 -Height 32
+            Set-V2ControlBounds -Control $toolsCard -X 0 -Y 184 -Width $pageW -Height 148
+            Set-V2ControlBounds -Control $pcnDriverLink -X 20 -Y 78 -Width 225 -Height 24
+            Set-V2ControlBounds -Control $pcnOfficeLink -X 20 -Y 110 -Width 225 -Height 24
+            Set-V2ControlBounds -Control $pcnActivationLink -X 290 -Y 78 -Width 205 -Height 24
+            Set-V2ControlBounds -Control $pcnWindowsLink -X 290 -Y 110 -Width 205 -Height 24
+            Set-V2ControlBounds -Control $passwordBox -X ([Math]::Max(620, $pageW - 250)) -Y 88 -Width 190 -Height 28
+            Set-V2ControlBounds -Control $sourcesCard -X 0 -Y 348 -Width $pageW -Height 150
+        }
+
+        Set-V2ControlBounds -Control $logsCard -X 0 -Y 0 -Width $pageW -Height ([Math]::Max(380, $pageH - 4))
+        Set-V2ControlBounds -Control $logFilterLabel -X ([Math]::Max(520, $pageW - 260)) -Y 48 -Width 230 -Height 20
+        Set-V2ControlBounds -Control $filterBox -X ([Math]::Max(520, $pageW - 260)) -Y 72 -Width 230 -Height 28
+        Set-V2ControlBounds -Control $logBox -X 20 -Y 112 -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height ([Math]::Max(210, $logsCard.Height - 165))
+        Set-V2ControlBounds -Control $logFooter -X 20 -Y ([Math]::Max(330, $logsCard.Height - 38)) -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height 24
+
+        foreach ($page in $pages.Values) {
+            $page.Invalidate()
         }
     }
 
@@ -1998,6 +2164,7 @@ function Show-PcnWinUpdateV2Ui {
         }
     })
     $filterBox.Add_TextChanged({ Refresh-V2Logs })
+    $content.Add_Resize({ Set-V2ResponsiveLayout })
 
     $form.Add_FormClosed({
         $smokeTimer.Stop()
@@ -2012,6 +2179,7 @@ function Show-PcnWinUpdateV2Ui {
     $form.Add_Shown({
         Load-V2ScheduleConfig
         Refresh-V2Status
+        Set-V2ResponsiveLayout
         $initialPage = 'Dashboard'
         if (-not [string]::IsNullOrWhiteSpace([string]$env:PCNINJA_V2_UI_SMOKE_PAGE) -and $pages.ContainsKey([string]$env:PCNINJA_V2_UI_SMOKE_PAGE)) {
             $initialPage = [string]$env:PCNINJA_V2_UI_SMOKE_PAGE
