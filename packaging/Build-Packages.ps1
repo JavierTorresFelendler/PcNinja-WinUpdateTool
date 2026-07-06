@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.12.0'
+    $Version = '2.0.13.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC13'
+    $PublicLabel = 'V2.0.0-RC14'
 }
 
 if (-not $Repository) {
@@ -570,6 +570,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Fixes the V2 schedule summary falsely showing Task not installed after a schedule is saved.',
     '- Treats no-update preview scans as successful and ignores helper output before the preview JSON result.',
     '- Labels the V2 log filter box and reduces follow-mode flicker by scrolling only when log text changes.',
+    '- Reworks the V2 Drivers tab into audit, PcNinja tools, and manufacturer reference sections.',
     '- Fixes V2 available-update preview result handling so successful scans do not surface as generic Failed popups.',
     '- Filters warning/info stream noise from V2 preview JSON output so Check Available Updates can complete in MSI and portable builds.',
     '- Adds Clear Schedule in V2 Settings and removes all PcNinja WinUpdate Tool scheduled tasks during cleanup.',

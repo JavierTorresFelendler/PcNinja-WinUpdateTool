@@ -919,38 +919,47 @@ function Show-PcnWinUpdateV2Ui {
     $schedule.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton))
 
     $drivers = $pages['Drivers']
-    $auditCard = New-V2Card -X 0 -Y 0 -Width 420 -Height 175 -Title 'Driver Audit'
-    $auditCard.Controls.Add((New-V2Label -Text 'Scan your system and create a driver inventory report.' -X 20 -Y 42 -Width 360 -Height 24 -ForeColor $colors.Muted))
-    $driverAuditButton = New-V2Button -Text 'Create Audit' -X 20 -Y 82 -Width 150 -Height 36
-    $openDriverReportButton = New-V2Button -Text 'Open Report' -X 188 -Y 82 -Width 150 -Height 36 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
-    $auditStatus = New-V2Label -Text 'Last audit: Not yet' -X 20 -Y 132 -Width 360 -Height 24 -ForeColor $colors.Muted
-    $auditCard.Controls.AddRange([System.Windows.Forms.Control[]]@($driverAuditButton, $openDriverReportButton, $auditStatus))
+    $auditCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 168 -Title ''
+    $auditCard.Controls.Add((New-V2Label -Text 'Driver Audit' -X 20 -Y 12 -Width 260 -Height 26 -Font $fontTitle))
+    $auditCard.Controls.Add((New-V2Label -Text 'Scan your system and create a driver inventory report.' -X 20 -Y 46 -Width 420 -Height 24 -ForeColor $colors.Muted))
+    $driverAuditButton = New-V2Button -Text 'Create Audit' -X 20 -Y 94 -Width 150 -Height 36
+    $openDriverReportButton = New-V2Button -Text 'Open Report' -X 188 -Y 94 -Width 150 -Height 36 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+    $auditStatus = New-V2Label -Text 'Last audit: Not yet' -X 20 -Y 134 -Width 420 -Height 24 -ForeColor $colors.Muted
+    $auditDivider = New-Object System.Windows.Forms.Panel
+    $auditDivider.BackColor = $colors.Border
+    $auditDivider.Location = New-V2Point 488 22
+    $auditDivider.Size = New-V2Size 1 122
+    $auditCard.Controls.Add($auditDivider)
+    $auditCard.Controls.Add((New-V2Label -Text 'Latest Report' -X 520 -Y 12 -Width 300 -Height 26 -Font $fontTitle))
+    $reportSummary = New-V2Label -Text "Devices scanned: -`r`nDrivers found: -`r`nOutdated drivers: -`r`nUnknown devices: -" -X 520 -Y 50 -Width 175 -Height 92 -ForeColor $colors.Text
+    $viewFullReportButton = New-V2Button -Text 'View Full Report' -X 710 -Y 96 -Width 140 -Height 32
+    $auditCard.Controls.AddRange([System.Windows.Forms.Control[]]@($driverAuditButton, $openDriverReportButton, $auditStatus, $reportSummary, $viewFullReportButton))
     $drivers.Controls.Add($auditCard)
 
-    $reportCard = New-V2Card -X 440 -Y 0 -Width 430 -Height 175 -Title 'Latest Report'
-    $reportSummary = New-V2Label -Text "Devices scanned: -`r`nDrivers found: -`r`nOutdated drivers: -`r`nUnknown devices: -" -X 20 -Y 48 -Width 260 -Height 92 -ForeColor $colors.Text
-    $viewFullReportButton = New-V2Button -Text 'View Full Report' -X 270 -Y 120 -Width 140 -Height 32
-    $reportCard.Controls.AddRange([System.Windows.Forms.Control[]]@($reportSummary, $viewFullReportButton))
-    $drivers.Controls.Add($reportCard)
+    $toolsCard = New-V2Card -X 0 -Y 184 -Width 870 -Height 148 -Title 'PcNinja Tools'
+    $toolsCard.Controls.Add((New-V2Label -Text 'PcNinja download links and shared file password.' -X 20 -Y 42 -Width 440 -Height 24 -ForeColor $colors.Muted))
+    $pcnDriverLink = New-V2LinkLabel -Text 'PcNinja Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 78 -Width 225
+    $pcnOfficeLink = New-V2LinkLabel -Text 'PcNinja Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 110 -Width 225
+    $pcnActivationLink = New-V2LinkLabel -Text 'PcNinja Activation' -Url 'https://active.pcninja.pro' -X 290 -Y 78 -Width 205
+    $pcnWindowsLink = New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 290 -Y 110 -Width 205
+    foreach ($pcnLink in @($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink)) {
+        $pcnLink.Font = $fontTitle
+    }
 
-    $toolsCard = New-V2Card -X 0 -Y 192 -Width 420 -Height 210 -Title 'PcNinja Tools'
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 52 -Width 195))
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 84 -Width 195))
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Activation' -Url 'https://active.pcninja.pro' -X 20 -Y 116 -Width 195))
-    $toolsCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 20 -Y 148 -Width 195))
-    $toolsCard.Controls.Add((New-V2Label -Text 'File password:' -X 250 -Y 52 -Width 145 -Height 24 -ForeColor $colors.Muted))
-    $passwordBox = New-V2TextBox -X 250 -Y 82 -Width 145 -Text 'JavierTorres'
+    $toolsCard.Controls.Add((New-V2Label -Text 'File password' -X 620 -Y 58 -Width 190 -Height 24 -ForeColor $colors.Muted))
+    $passwordBox = New-V2TextBox -X 620 -Y 88 -Width 190 -Text 'JavierTorres'
     $passwordBox.ReadOnly = $true
     $passwordBox.TextAlign = 'Center'
-    $toolsCard.Controls.Add($passwordBox)
+    $toolsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink, $passwordBox))
     $drivers.Controls.Add($toolsCard)
 
-    $sourcesCard = New-V2Card -X 440 -Y 192 -Width 430 -Height 210 -Title 'Manufacturer Sources (Reference Only)'
-    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'Dell Drivers' -Url 'https://www.dell.com/support/home/en-us?app=drivers' -X 20 -Y 52))
-    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'HP Support' -Url 'https://ftp.ext.hp.com/pub/caps-softpaq/cmit/HPIA.html' -X 20 -Y 84))
-    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'Lenovo Support' -Url 'https://support.lenovo.com/us/en/solutions/ht003029-lenovo-system-update-update-drivers-bios-and-applications' -X 20 -Y 116))
-    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'ASUS Support' -Url 'https://www.asus.com/support/download-center/' -X 20 -Y 148))
-    $sourcesCard.Controls.Add((New-V2Label -Text 'Links are reference only. Installation is not performed by this tool.' -X 20 -Y 176 -Width 380 -Height 22 -Font $fontSmall -ForeColor $colors.Muted))
+    $sourcesCard = New-V2Card -X 0 -Y 348 -Width 870 -Height 150 -Title 'Manufacturer Sources (Reference Only)'
+    $sourcesCard.Controls.Add((New-V2Label -Text 'Use these sources for reference and manual research. This tool does not install vendor packages from these links.' -X 20 -Y 42 -Width 790 -Height 24 -ForeColor $colors.Muted))
+    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'Dell Drivers' -Url 'https://www.dell.com/support/home/en-us?app=drivers' -X 20 -Y 82 -Width 180))
+    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'HP Support' -Url 'https://ftp.ext.hp.com/pub/caps-softpaq/cmit/HPIA.html' -X 225 -Y 82 -Width 180))
+    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'Lenovo Support' -Url 'https://support.lenovo.com/us/en/solutions/ht003029-lenovo-system-update-update-drivers-bios-and-applications' -X 430 -Y 82 -Width 180))
+    $sourcesCard.Controls.Add((New-V2LinkLabel -Text 'ASUS Support' -Url 'https://www.asus.com/support/download-center/' -X 635 -Y 82 -Width 180))
+    $sourcesCard.Controls.Add((New-V2Label -Text 'Driver installation remains controlled by Windows Update unless a future vendor module is added.' -X 20 -Y 116 -Width 790 -Height 22 -Font $fontSmall -ForeColor $colors.Muted))
     $drivers.Controls.Add($sourcesCard)
 
     $logs = $pages['Logs']
@@ -1869,7 +1878,12 @@ function Show-PcnWinUpdateV2Ui {
     $form.Add_Shown({
         Load-V2ScheduleConfig
         Refresh-V2Status
-        Show-V2Page -Name 'Dashboard'
+        $initialPage = 'Dashboard'
+        if (-not [string]::IsNullOrWhiteSpace([string]$env:PCNINJA_V2_UI_SMOKE_PAGE) -and $pages.ContainsKey([string]$env:PCNINJA_V2_UI_SMOKE_PAGE)) {
+            $initialPage = [string]$env:PCNINJA_V2_UI_SMOKE_PAGE
+        }
+
+        Show-V2Page -Name $initialPage
         if ([string]$env:PCNINJA_V2_UI_SMOKE -eq '1') {
             $footerLabel.Text = 'V2 UI smoke test ready.'
             $smokeTimer.Start()
