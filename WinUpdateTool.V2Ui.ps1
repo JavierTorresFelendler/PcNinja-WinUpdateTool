@@ -770,6 +770,9 @@ function Show-PcnWinUpdateV2Ui {
         LastLogText = $null
         LastLogFilter = $null
         LogFilterPlaceholderActive = $false
+        LogFilePath = $null
+        LogFileOffset = 0L
+        LogLoadedLineCount = 0
     }
 
     $smokeTimer = New-Object System.Windows.Forms.Timer
@@ -780,10 +783,10 @@ function Show-PcnWinUpdateV2Ui {
     })
 
     $logFollowTimer = New-Object System.Windows.Forms.Timer
-    $logFollowTimer.Interval = 1500
+    $logFollowTimer.Interval = 1000
     $logFollowTimer.Add_Tick({
         if ($pages.ContainsKey('Logs') -and $pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
-            Refresh-V2Logs -ScrollToEnd
+            Update-V2LogFollow
         }
     })
 
@@ -864,7 +867,7 @@ function Show-PcnWinUpdateV2Ui {
     $updates.Controls.Add($linksCard)
 
     $schedule = $pages['Schedule']
-    $scheduleCard = New-V2Card -X 0 -Y 0 -Width 430 -Height 230 -Title 'Schedule'
+    $scheduleCard = New-V2Card -X 0 -Y 0 -Width 560 -Height 220 -Title 'Schedule'
     $scheduleCard.Controls.Add((New-V2Label -Text 'Choose when the tool should run Windows Update.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted))
     $dailyRadio = New-Object System.Windows.Forms.RadioButton
     $weeklyRadio = New-Object System.Windows.Forms.RadioButton
@@ -883,39 +886,46 @@ function Show-PcnWinUpdateV2Ui {
         $row[0].AutoSize = $true
         $scheduleCard.Controls.Add($row[0])
     }
-    $scheduleTimeCombo = New-V2ComboBox -X 180 -Y 60 -Width 120 -Items @('02:00', '03:00', '04:00', '09:00', '18:00') -Selected '03:00'
-    $scheduleDayCombo = New-V2ComboBox -X 180 -Y 92 -Width 120 -Items @('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') -Selected 'Sunday'
-    $scheduleMonthDayCombo = New-V2ComboBox -X 180 -Y 124 -Width 120 -Items @('1', '5', '10', '15', '20', '25', '28') -Selected '15'
+    $scheduleTimeCombo = New-V2ComboBox -X 230 -Y 60 -Width 145 -Items @('02:00', '03:00', '04:00', '09:00', '18:00') -Selected '03:00'
+    $scheduleDayCombo = New-V2ComboBox -X 230 -Y 92 -Width 145 -Items @('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') -Selected 'Sunday'
+    $scheduleMonthDayCombo = New-V2ComboBox -X 230 -Y 124 -Width 145 -Items @('1', '5', '10', '15', '20', '25', '28') -Selected '15'
     $scheduleCard.Controls.AddRange([System.Windows.Forms.Control[]]@($scheduleTimeCombo, $scheduleDayCombo, $scheduleMonthDayCombo))
     $schedule.Controls.Add($scheduleCard)
 
-    $retryCard = New-V2Card -X 445 -Y 0 -Width 425 -Height 230 -Title 'Retry Policy'
-    $retryCard.Controls.Add((New-V2Label -Text 'Configure how to handle failures and retries.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted))
-    $retryCard.Controls.Add((New-V2Label -Text 'Retry failed updates' -X 20 -Y 78 -Width 170 -Height 24))
-    $retryAttemptsCombo = New-V2ComboBox -X 220 -Y 74 -Width 160 -Items @('0 times', '1 time', '3 times', '5 times') -Selected '3 times'
-    $retryCard.Controls.Add((New-V2Label -Text 'Retry interval' -X 20 -Y 118 -Width 170 -Height 24))
-    $retryIntervalCombo = New-V2ComboBox -X 220 -Y 114 -Width 160 -Items @('5 minutes', '15 minutes', '60 minutes') -Selected '5 minutes'
-    $retryCard.Controls.Add((New-V2Label -Text 'On repeated failure' -X 20 -Y 158 -Width 170 -Height 24))
-    $retryFailureCombo = New-V2ComboBox -X 220 -Y 154 -Width 160 -Items @('Snooz and retry later', 'Stop after retries') -Selected 'Snooz and retry later'
-    $retryCard.Controls.AddRange([System.Windows.Forms.Control[]]@($retryAttemptsCombo, $retryIntervalCombo, $retryFailureCombo))
-    $schedule.Controls.Add($retryCard)
+    $nextCard = New-V2Card -X 580 -Y 0 -Width 290 -Height 220 -Title 'Next Run Summary'
+    $nextCard.Anchor = 'Top,Right'
+    $nextRunValue = New-V2Label -Text 'Not scheduled' -X 20 -Y 54 -Width 245 -Height 34 -Font $fontTitle -ForeColor $colors.Blue2
+    $nextModeValue = New-V2Label -Text 'Schedule disabled' -X 20 -Y 96 -Width 245 -Height 60 -ForeColor $colors.Muted
+    $nextCard.Controls.AddRange([System.Windows.Forms.Control[]]@($nextRunValue, $nextModeValue))
+    $schedule.Controls.Add($nextCard)
 
-    $wakeCard = New-V2Card -X 0 -Y 246 -Width 430 -Height 120 -Title 'Wake Options'
-    $startupCheck = New-V2CheckBox -Text 'Also run after startup' -X 20 -Y 36 -Checked $false
-    $startupDelayLabel = New-V2Label -Text 'Startup delay' -X 246 -Y 34 -Width 94 -Height 24 -ForeColor $colors.Muted
-    $startupDelayCombo = New-V2ComboBox -X 344 -Y 30 -Width 64 -Items @('0', '5', '15', '30', '60') -Selected '5'
-    $wakeCheck = New-V2CheckBox -Text 'Wake the computer to run this task' -X 20 -Y 68 -Checked $false
-    $missedCheck = New-V2CheckBox -Text 'Run if the task is missed' -X 20 -Y 96 -Checked $true
+    $wakeCard = New-V2Card -X 0 -Y 238 -Width 870 -Height 118 -Title 'Wake Options'
+    $wakeCard.Anchor = 'Top,Left,Right'
+    $startupCheck = New-V2CheckBox -Text 'Also run after startup' -X 20 -Y 42 -Checked $false
+    $startupDelayLabel = New-V2Label -Text 'Startup delay' -X 310 -Y 40 -Width 98 -Height 24 -ForeColor $colors.Muted
+    $startupDelayCombo = New-V2ComboBox -X 414 -Y 36 -Width 72 -Items @('0', '5', '15', '30', '60') -Selected '5'
+    $wakeCheck = New-V2CheckBox -Text 'Wake the computer to run this task' -X 20 -Y 78 -Checked $false
+    $missedCheck = New-V2CheckBox -Text 'Run if the task is missed' -X 414 -Y 78 -Checked $true
     $wakeCard.Controls.AddRange([System.Windows.Forms.Control[]]@($startupCheck, $startupDelayLabel, $startupDelayCombo, $wakeCheck, $missedCheck))
     $schedule.Controls.Add($wakeCard)
 
-    $nextCard = New-V2Card -X 445 -Y 246 -Width 425 -Height 120 -Title 'Next Run Summary'
-    $nextRunValue = New-V2Label -Text 'Not scheduled' -X 20 -Y 48 -Width 360 -Height 30 -Font $fontTitle -ForeColor $colors.Blue2
-    $nextModeValue = New-V2Label -Text 'Schedule disabled' -X 20 -Y 82 -Width 360 -Height 24 -ForeColor $colors.Muted
-    $nextCard.Controls.AddRange([System.Windows.Forms.Control[]]@($nextRunValue, $nextModeValue))
-    $schedule.Controls.Add($nextCard)
-    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 390 -Y 392 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
-    $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 625 -Y 392 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+    $retryCard = New-V2Card -X 0 -Y 374 -Width 870 -Height 110 -Title 'Retry Policy'
+    $retryCard.Anchor = 'Top,Left,Right'
+    $retryCard.Controls.Add((New-V2Label -Text 'Configure how to handle failures and retries.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted))
+    $retryCard.Controls.Add((New-V2Label -Text 'Retry failed updates' -X 20 -Y 74 -Width 145 -Height 24))
+    $retryAttemptsCombo = New-V2ComboBox -X 168 -Y 70 -Width 145 -Items @('0 times', '1 time', '3 times', '5 times') -Selected '3 times'
+    $retryCard.Controls.Add((New-V2Label -Text 'Retry interval' -X 340 -Y 74 -Width 105 -Height 24))
+    $retryIntervalCombo = New-V2ComboBox -X 448 -Y 70 -Width 145 -Items @('5 minutes', '15 minutes', '60 minutes') -Selected '5 minutes'
+    $retryCard.Controls.Add((New-V2Label -Text 'On repeated failure' -X 565 -Y 74 -Width 135 -Height 24))
+    $retryFailureCombo = New-V2ComboBox -X 704 -Y 70 -Width 144 -Items @('Snooz and retry later', 'Stop after retries') -Selected 'Snooz and retry later'
+    $retryFailureCombo.Anchor = 'Top,Right'
+    $retryCard.Controls.AddRange([System.Windows.Forms.Control[]]@($retryAttemptsCombo, $retryIntervalCombo, $retryFailureCombo))
+    $schedule.Controls.Add($retryCard)
+
+    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 390 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
+    $clearScheduleButton.Anchor = 'Bottom,Right'
+    $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 625 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+    $saveScheduleButton.Anchor = 'Bottom,Right'
     $schedule.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton))
 
     $drivers = $pages['Drivers']
@@ -964,17 +974,22 @@ function Show-PcnWinUpdateV2Ui {
 
     $logs = $pages['Logs']
     $logsCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 510 -Title 'Application Logs'
+    $logsCard.Anchor = 'Top,Bottom,Left,Right'
     $logsCard.Controls.Add((New-V2Label -Text 'View and analyze tool logs for troubleshooting.' -X 20 -Y 40 -Width 400 -Height 24 -ForeColor $colors.Muted))
-    $logsCard.Controls.Add((New-V2Label -Text 'Filter logs' -X 610 -Y 48 -Width 230 -Height 20 -Font $fontSmall -ForeColor $colors.Muted))
+    $logFilterLabel = New-V2Label -Text 'Filter logs' -X 610 -Y 48 -Width 230 -Height 20 -Font $fontSmall -ForeColor $colors.Muted
+    $logFilterLabel.Anchor = 'Top,Right'
+    $logsCard.Controls.Add($logFilterLabel)
     $refreshLogsButton = New-V2Button -Text 'Refresh' -X 20 -Y 72 -Width 110 -Height 30
     $followLogsButton = New-V2Button -Text 'Following' -X 140 -Y 72 -Width 110 -Height 30
     $bottomLogsButton = New-V2Button -Text 'Bottom' -X 260 -Y 72 -Width 110 -Height 30
+    $openLogFileButton = New-V2Button -Text 'Open Log File' -X 380 -Y 72 -Width 125 -Height 30 -BorderColor $colors.Border
     $filterBox = New-V2TextBox -X 610 -Y 72 -Width 230 -Height 28 -Text ''
+    $filterBox.Anchor = 'Top,Right'
     $logFilterPlaceholder = 'Type to filter...'
     $filterBox.Text = $logFilterPlaceholder
     $filterBox.ForeColor = $colors.Muted
     $uiState.LogFilterPlaceholderActive = $true
-    $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $filterBox))
+    $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $openLogFileButton, $filterBox))
     $logBox = New-Object System.Windows.Forms.RichTextBox
     $logBox.ReadOnly = $true
     $logBox.BorderStyle = 'FixedSingle'
@@ -984,11 +999,129 @@ function Show-PcnWinUpdateV2Ui {
     $logBox.Location = New-V2Point 20 112
     $logBox.Size = New-V2Size 820 345
     $logBox.Anchor = 'Top,Bottom,Left,Right'
-    $logBox.WordWrap = $false
+    $logBox.WordWrap = $true
+    $logBox.ScrollBars = 'ForcedVertical'
+    $logBox.HideSelection = $false
     $logsCard.Controls.Add($logBox)
     $logFooter = New-V2Label -Text 'Log file: WinUpdateTool.log' -X 20 -Y 466 -Width 600 -Height 24 -Font $fontSmall -ForeColor $colors.Muted
+    $logFooter.Anchor = 'Bottom,Left,Right'
     $logsCard.Controls.Add($logFooter)
     $logs.Controls.Add($logsCard)
+
+    function Get-V2LogFilter {
+        if ([bool]$uiState.LogFilterPlaceholderActive) {
+            return ''
+        }
+
+        return [string]$filterBox.Text
+    }
+
+    function Set-V2LogFollowOffset {
+        param([string]$Path)
+
+        if (Test-Path -LiteralPath $Path -PathType Leaf) {
+            $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+            $uiState.LogFilePath = [string]$item.FullName
+            $uiState.LogFileOffset = [int64]$item.Length
+        }
+    }
+
+    function Add-V2LogText {
+        param(
+            [AllowNull()]
+            [string]$Text,
+
+            [switch]$ScrollToEnd
+        )
+
+        if ([string]::IsNullOrEmpty($Text)) {
+            return
+        }
+
+        $logBox.SuspendLayout()
+        try {
+            $logBox.AppendText($Text)
+            if ($logBox.TextLength -gt 240000) {
+                $trimStart = [Math]::Max(0, $logBox.TextLength - 180000)
+                $logBox.Text = $logBox.Text.Substring($trimStart)
+            }
+
+            if ($ScrollToEnd) {
+                $logBox.SelectionStart = $logBox.TextLength
+                $logBox.SelectionLength = 0
+                $logBox.ScrollToCaret()
+            }
+        }
+        finally {
+            $logBox.ResumeLayout()
+        }
+    }
+
+    function Update-V2LogFollow {
+        try {
+            $paths = Initialize-PcnWinUpdateFolders
+            if (-not (Test-Path -LiteralPath $paths.LogFile -PathType Leaf)) {
+                return
+            }
+
+            $item = Get-Item -LiteralPath $paths.LogFile -ErrorAction Stop
+            if ($uiState.LogFilePath -ne [string]$item.FullName -or [int64]$uiState.LogFileOffset -gt [int64]$item.Length) {
+                Refresh-V2Logs -ScrollToEnd
+                return
+            }
+
+            if ([int64]$uiState.LogFileOffset -eq [int64]$item.Length) {
+                return
+            }
+
+            $stream = [System.IO.File]::Open($item.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            try {
+                [void]$stream.Seek([int64]$uiState.LogFileOffset, [System.IO.SeekOrigin]::Begin)
+                $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8, $true)
+                try {
+                    $newText = $reader.ReadToEnd()
+                    $uiState.LogFileOffset = [int64]$stream.Position
+                }
+                finally {
+                    $reader.Dispose()
+                }
+            }
+            finally {
+                if ($stream) {
+                    $stream.Dispose()
+                }
+            }
+
+            $filter = Get-V2LogFilter
+            if (-not [string]::IsNullOrWhiteSpace($filter)) {
+                $newLines = @($newText -split "`r?`n" | Where-Object { $_ -like "*$filter*" })
+                if ($newLines.Count -eq 0) {
+                    return
+                }
+                $newText = (($newLines -join "`r`n") + "`r`n")
+            }
+
+            Add-V2LogText -Text $newText -ScrollToEnd
+            $logFooter.Text = "Log file: $($paths.LogFile)    Follow: live append"
+        }
+        catch {
+            $footerLabel.Text = "Log follow warning: $($_.Exception.Message)"
+        }
+    }
+
+    function Open-V2LogFile {
+        try {
+            $paths = Initialize-PcnWinUpdateFolders
+            if (-not (Test-Path -LiteralPath $paths.LogFile -PathType Leaf)) {
+                Set-Content -LiteralPath $paths.LogFile -Value 'No log entries yet.' -Encoding UTF8
+            }
+
+            Start-Process -FilePath 'notepad.exe' -ArgumentList "`"$($paths.LogFile)`"" | Out-Null
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Open Log File', 'OK', 'Warning') | Out-Null
+        }
+    }
 
     function Refresh-V2Logs {
         param([switch]$ScrollToEnd)
@@ -1001,10 +1134,7 @@ function Show-PcnWinUpdateV2Ui {
             }
 
             $lines = Get-Content -LiteralPath $paths.LogFile -Tail 1250 -ErrorAction Stop
-            $filter = ''
-            if (-not [bool]$uiState.LogFilterPlaceholderActive) {
-                $filter = [string]$filterBox.Text
-            }
+            $filter = Get-V2LogFilter
             if (-not [string]::IsNullOrWhiteSpace($filter)) {
                 $lines = $lines | Where-Object { $_ -like "*$filter*" }
             }
@@ -1025,9 +1155,12 @@ function Show-PcnWinUpdateV2Ui {
 
             if ($ScrollToEnd -or (($changed) -and [bool]$uiState.LogFollow)) {
                 $logBox.SelectionStart = $logBox.TextLength
+                $logBox.SelectionLength = 0
                 $logBox.ScrollToCaret()
             }
 
+            Set-V2LogFollowOffset -Path $paths.LogFile
+            $uiState.LogLoadedLineCount = @($lines).Count
             $logFooter.Text = "Log file: $($paths.LogFile)    Lines loaded: $(@($lines).Count)"
         }
         catch {
@@ -1840,6 +1973,7 @@ function Show-PcnWinUpdateV2Ui {
     $openDriverReportButton.Add_Click({ Open-V2DriverReports })
     $viewFullReportButton.Add_Click({ Open-V2DriverReports })
     $refreshLogsButton.Add_Click({ Refresh-V2Logs })
+    $openLogFileButton.Add_Click({ Open-V2LogFile })
     $followLogsButton.Add_Click({
         $uiState.LogFollow = -not [bool]$uiState.LogFollow
         $followLogsButton.Text = if ([bool]$uiState.LogFollow) { 'Following' } else { 'Follow' }
