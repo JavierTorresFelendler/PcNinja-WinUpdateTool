@@ -767,6 +767,9 @@ function Show-PcnWinUpdateV2Ui {
         ScanErrPath = $null
         LastPreviewItems = @()
         PendingReboot = $null
+        LastLogText = $null
+        LastLogFilter = $null
+        LogFilterPlaceholderActive = $false
     }
 
     $smokeTimer = New-Object System.Windows.Forms.Timer
@@ -953,10 +956,15 @@ function Show-PcnWinUpdateV2Ui {
     $logs = $pages['Logs']
     $logsCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 510 -Title 'Application Logs'
     $logsCard.Controls.Add((New-V2Label -Text 'View and analyze tool logs for troubleshooting.' -X 20 -Y 40 -Width 400 -Height 24 -ForeColor $colors.Muted))
+    $logsCard.Controls.Add((New-V2Label -Text 'Filter logs' -X 610 -Y 48 -Width 230 -Height 20 -Font $fontSmall -ForeColor $colors.Muted))
     $refreshLogsButton = New-V2Button -Text 'Refresh' -X 20 -Y 72 -Width 110 -Height 30
     $followLogsButton = New-V2Button -Text 'Following' -X 140 -Y 72 -Width 110 -Height 30
     $bottomLogsButton = New-V2Button -Text 'Bottom' -X 260 -Y 72 -Width 110 -Height 30
     $filterBox = New-V2TextBox -X 610 -Y 72 -Width 230 -Height 28 -Text ''
+    $logFilterPlaceholder = 'Type to filter...'
+    $filterBox.Text = $logFilterPlaceholder
+    $filterBox.ForeColor = $colors.Muted
+    $uiState.LogFilterPlaceholderActive = $true
     $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $filterBox))
     $logBox = New-Object System.Windows.Forms.RichTextBox
     $logBox.ReadOnly = $true
@@ -984,17 +992,29 @@ function Show-PcnWinUpdateV2Ui {
             }
 
             $lines = Get-Content -LiteralPath $paths.LogFile -Tail 1250 -ErrorAction Stop
-            $filter = [string]$filterBox.Text
+            $filter = ''
+            if (-not [bool]$uiState.LogFilterPlaceholderActive) {
+                $filter = [string]$filterBox.Text
+            }
             if (-not [string]::IsNullOrWhiteSpace($filter)) {
                 $lines = $lines | Where-Object { $_ -like "*$filter*" }
             }
 
             $nextText = ($lines -join "`r`n")
-            if ($logBox.Text -ne $nextText) {
-                $logBox.Text = $nextText
+            $changed = ($uiState.LastLogText -ne $nextText)
+            if ($changed) {
+                $logBox.SuspendLayout()
+                try {
+                    $logBox.Text = $nextText
+                    $uiState.LastLogText = $nextText
+                    $uiState.LastLogFilter = $filter
+                }
+                finally {
+                    $logBox.ResumeLayout()
+                }
             }
 
-            if ($ScrollToEnd -or [bool]$uiState.LogFollow) {
+            if ($ScrollToEnd -or (($changed) -and [bool]$uiState.LogFollow)) {
                 $logBox.SelectionStart = $logBox.TextLength
                 $logBox.ScrollToCaret()
             }
@@ -1605,6 +1625,26 @@ function Show-PcnWinUpdateV2Ui {
             }
 
             $scan = ConvertFrom-V2ProcessJsonOutput -RawOutput $raw -Context 'Preview scan'
+            $scanObjects = @($scan)
+            if ($scanObjects.Count -gt 1 -or $scan -is [array]) {
+                $previewObjects = @($scanObjects | Where-Object {
+                    $_ -and $_.PSObject.Properties['Mode'] -and ([string]$_.Mode -eq 'PreviewUpdates')
+                })
+
+                if ($previewObjects.Count -gt 0) {
+                    $scan = $previewObjects[-1]
+                    Write-PcnWinUpdateLog -Message 'Preview scan returned multiple JSON objects. Using the PreviewUpdates result object.' -EntryType Warning -EventID 1098
+                }
+                else {
+                    $resultObjects = @($scanObjects | Where-Object {
+                        $_ -and ($_.PSObject.Properties['Success'] -or $_.PSObject.Properties['Result'])
+                    })
+                    if ($resultObjects.Count -gt 0) {
+                        $scan = $resultObjects[-1]
+                    }
+                }
+            }
+
             $scanSucceeded = $false
             if ($scan.PSObject.Properties['Success']) {
                 $scanSucceeded = [bool]$scan.Success
@@ -1642,9 +1682,19 @@ function Show-PcnWinUpdateV2Ui {
             $driversCount.Text = [string]$scan.Drivers
             $firmwareSkippedCount.Text = [string]$scan.FirmwareSkipped
             $uiState.LastPreviewItems = @($scan.Items)
-            $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). Included: $($scan.Total), discovered: $($scan.TotalDiscovered)."
+            if ([int]$scan.Total -eq 0) {
+                $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). No available updates for this machine."
+            }
+            else {
+                $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). Included: $($scan.Total), discovered: $($scan.TotalDiscovered)."
+            }
             $lastScanValue.Text = (Get-Date).ToString('dd-MMM HH:mm')
-            $footerLabel.Text = "Check complete. Important: $($scan.Important), Optional: $($scan.Optional), Drivers: $($scan.Drivers), Firmware skipped: $($scan.FirmwareSkipped)."
+            $footerLabel.Text = if ([int]$scan.Total -eq 0) {
+                'Check complete. No available updates found.'
+            }
+            else {
+                "Check complete. Important: $($scan.Important), Optional: $($scan.Optional), Drivers: $($scan.Drivers), Firmware skipped: $($scan.FirmwareSkipped)."
+            }
             Refresh-V2Status
             if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
                 Refresh-V2Logs -ScrollToEnd
@@ -1790,6 +1840,20 @@ function Show-PcnWinUpdateV2Ui {
         }
     })
     $bottomLogsButton.Add_Click({ $logBox.SelectionStart = $logBox.TextLength; $logBox.ScrollToCaret() })
+    $filterBox.Add_GotFocus({
+        if ([bool]$uiState.LogFilterPlaceholderActive) {
+            $uiState.LogFilterPlaceholderActive = $false
+            $filterBox.Text = ''
+            $filterBox.ForeColor = $colors.Text
+        }
+    })
+    $filterBox.Add_LostFocus({
+        if ([string]::IsNullOrWhiteSpace([string]$filterBox.Text)) {
+            $uiState.LogFilterPlaceholderActive = $true
+            $filterBox.ForeColor = $colors.Muted
+            $filterBox.Text = $logFilterPlaceholder
+        }
+    })
     $filterBox.Add_TextChanged({ Refresh-V2Logs })
 
     $form.Add_FormClosed({

@@ -99,8 +99,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC12'
-        Version = '2.0.11.0'
+        PublicLabel = 'V2.0.0-RC13'
+        Version = '2.0.12.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -816,9 +816,9 @@ function Invoke-PcnUpdatePreviewScan {
         [switch]$IncludeFirmwareUpdates
     )
 
-    Enable-PcnMicrosoftUpdate
+    Enable-PcnMicrosoftUpdate | Out-Null
     Test-PcnNetworkReadiness | Out-Null
-    Initialize-PcnWindowsUpdateServices
+    Initialize-PcnWindowsUpdateServices | Out-Null
 
     $session = New-Object -ComObject Microsoft.Update.Session
     $session.ClientApplicationID = 'PcNinja WinUpdate Tool'
