@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.15.0'
+    $Version = '2.0.16.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC16'
+    $PublicLabel = 'V2.0.0-RC17'
 }
 
 if (-not $Repository) {
@@ -574,6 +574,11 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Rebalances the V2 Settings layout with wider wake and retry sections plus lower action buttons.',
     '- Makes V2 Logs resize with the window, adds Open Log File, wraps long lines, and follows with live append.',
     '- Adds responsive V2 page layout rules so cards and controls adapt to narrow VM windows and maximized screens.',
+    '- Removes unwanted Dashboard scrollbars in the normal V2 window size.',
+    '- Automatically checks GitHub for tool updates after the UI opens and shows an update dialog only when a newer release exists.',
+    '- Adds MSI relaunch handoff and portable EXE download-and-run handoff for user-approved tool updates.',
+    '- Adds a public support log bundle export button in Logs.',
+    '- Updates footer result status after scans and background runs complete.',
     '- Fixes V2 available-update preview result handling so successful scans do not surface as generic Failed popups.',
     '- Filters warning/info stream noise from V2 preview JSON output so Check Available Updates can complete in MSI and portable builds.',
     '- Adds Clear Schedule in V2 Settings and removes all PcNinja WinUpdate Tool scheduled tasks during cleanup.',

@@ -373,9 +373,90 @@ function Show-PcnWinUpdateV2Ui {
         return $process
     }
 
+    function Set-V2FooterStatus {
+        param(
+            [string]$Message,
+            [string]$SystemText,
+            [System.Drawing.Color]$SystemColor
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($Message)) {
+            $footerLabel.Text = $Message
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($SystemText)) {
+            $systemLabel.Text = $SystemText
+        }
+
+        if ($SystemColor) {
+            $systemLabel.ForeColor = $SystemColor
+        }
+    }
+
+    function Start-V2PostUpdateRelaunch {
+        param(
+            [ValidateSet('Msi', 'Portable')]
+            [string]$PackageType,
+
+            [int]$InstallerProcessId = 0,
+
+            [string]$TargetPath
+        )
+
+        try {
+            $scriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("PcNinja-PostUpdateRelaunch-{0}.ps1" -f ([guid]::NewGuid().ToString('N')))
+            $watcher = @'
+param(
+    [int]$InstallerProcessId,
+    [string]$TargetPath,
+    [string]$PackageType
+)
+
+try {
+    if ($InstallerProcessId -gt 0) {
+        $deadline = (Get-Date).AddMinutes(15)
+        while ((Get-Date) -lt $deadline) {
+            $process = Get-Process -Id $InstallerProcessId -ErrorAction SilentlyContinue
+            if (-not $process) {
+                break
+            }
+
+            Start-Sleep -Seconds 2
+        }
+    }
+}
+catch {
+}
+
+Start-Sleep -Seconds 3
+
+if ($PackageType -eq 'Msi') {
+    $TargetPath = Join-Path $env:ProgramFiles 'PcNinja\WinUpdateTool\PcNinja.WinUpdateTool.exe'
+}
+
+if (-not [string]::IsNullOrWhiteSpace($TargetPath) -and (Test-Path -LiteralPath $TargetPath -PathType Leaf)) {
+    Start-Process -FilePath $TargetPath | Out-Null
+}
+
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+'@
+            Set-Content -LiteralPath $scriptPath -Value $watcher -Encoding UTF8 -Force
+            $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -InstallerProcessId {1} -TargetPath "{2}" -PackageType {3}' -f $scriptPath, $InstallerProcessId, ([string]$TargetPath).Replace('"', '""'), $PackageType
+            Start-Process -FilePath (Get-PcnPowershellPath) -ArgumentList $arguments -WindowStyle Hidden | Out-Null
+            Write-PcnWinUpdateLog -Message "Post-update relaunch watcher started. Package: $PackageType. Installer PID: $InstallerProcessId. Target: $TargetPath" -EventID 1093
+        }
+        catch {
+            Write-PcnWinUpdateLog -Message "Post-update relaunch watcher failed to start: $($_.Exception.Message)" -EntryType Warning -EventID 1094
+        }
+    }
+
     function Show-V2ToolUpdateDialog {
         param(
-            [System.Windows.Forms.Form]$Owner
+            [System.Windows.Forms.Form]$Owner,
+
+            [object]$InitialCheck,
+
+            [switch]$AutomaticNotification
         )
 
         $dialog = New-Object System.Windows.Forms.Form
@@ -443,7 +524,13 @@ function Show-PcnWinUpdateV2Ui {
 
         $info = New-V2Card -X 24 -Y 328 -Width 712 -Height 62 -Title ''
         $info.Controls.Add((New-V2Label -Text ([string][char]0xE946) -X 22 -Y 12 -Width 38 -Height 38 -Font (New-Object System.Drawing.Font('Segoe MDL2 Assets', 24)) -ForeColor $colors.Blue2 -Align 'MiddleCenter'))
-        $infoText = New-V2Label -Text "V2 downloads the $packageLabel directly from GitHub Releases and verifies SHA256." -X 72 -Y 12 -Width 610 -Height 38
+        $handoffText = if ($packageType -eq 'Portable') {
+            "V2 downloads the $packageLabel, verifies SHA256, closes this app, and starts the new EXE."
+        }
+        else {
+            "V2 downloads the $packageLabel, verifies SHA256, starts Windows Installer, and relaunches after installation."
+        }
+        $infoText = New-V2Label -Text $handoffText -X 72 -Y 12 -Width 610 -Height 38
         $info.Controls.Add($infoText)
         $dialog.Controls.Add($info)
 
@@ -453,10 +540,10 @@ function Show-PcnWinUpdateV2Ui {
         $dialog.Controls.Add($safety)
 
         $checkButton = New-V2Button -Text 'Check Again' -X 24 -Y 466 -Width 128 -Height 32
-        $downloadButton = New-V2Button -Text $(if ($packageType -eq 'Portable') { 'Download EXE' } else { 'Download Verified' }) -X 164 -Y 466 -Width 164 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(13, 36, 58))
-        $installButton = New-V2Button -Text 'Install MSI' -X 340 -Y 466 -Width 118 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 67)) -BorderColor $colors.Purple
+        $downloadButton = New-V2Button -Text $(if ($packageType -eq 'Portable') { 'Download & Run EXE' } else { 'Download Verified' }) -X 164 -Y 466 -Width $(if ($packageType -eq 'Portable') { 176 } else { 164 }) -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(13, 36, 58))
+        $installButton = New-V2Button -Text 'Download & Install MSI' -X 340 -Y 466 -Width 150 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 67)) -BorderColor $colors.Purple
         $installButton.Visible = ($packageType -eq 'Msi')
-        $releaseButton = New-V2Button -Text 'Open Release Page' -X 470 -Y 466 -Width 154 -Height 32
+        $releaseButton = New-V2Button -Text 'Release Page' -X $(if ($packageType -eq 'Portable') { 352 } else { 502 }) -Y 466 -Width $(if ($packageType -eq 'Portable') { 154 } else { 122 }) -Height 32
         $closeDialogButton = New-V2Button -Text 'Close' -X 636 -Y 466 -Width 100 -Height 32 -BorderColor $colors.Border
         $dialog.Controls.AddRange([System.Windows.Forms.Control[]]@($checkButton, $downloadButton, $installButton, $releaseButton, $closeDialogButton))
 
@@ -520,6 +607,19 @@ function Show-PcnWinUpdateV2Ui {
 
         $downloadButton.Add_Click({
             try {
+                if ($packageType -eq 'Portable') {
+                    $answer = [System.Windows.Forms.MessageBox]::Show(
+                        "This will download the verified portable EXE, close the current app, and start the new EXE from the same folder.`r`n`r`nContinue?",
+                        'Run Portable Update',
+                        'YesNo',
+                        'Question'
+                    )
+
+                    if ($answer -ne 'Yes') {
+                        return
+                    }
+                }
+
                 $target = Get-V2AppUpdateDownloadFolder -PackageType $packageType
                 $summary.Text = "Downloading verified $packageLabel to:`r`n$target"
                 $dialog.Refresh()
@@ -527,7 +627,15 @@ function Show-PcnWinUpdateV2Ui {
                 if ($download.Success -and $download.FilePath) {
                     $shaValue.Text = 'Verified'
                     $shaValue.ForeColor = $colors.Green
-                    [System.Windows.Forms.MessageBox]::Show("Downloaded and verified:`r`n$($download.FilePath)", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                    if ($packageType -eq 'Portable') {
+                        [System.Windows.Forms.MessageBox]::Show("Downloaded and verified:`r`n$($download.FilePath)`r`n`r`nThe current app will close and the new EXE will start.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                        Start-V2PostUpdateRelaunch -PackageType Portable -TargetPath ([string]$download.FilePath)
+                        $dialog.Close()
+                        $Owner.Close()
+                    }
+                    else {
+                        [System.Windows.Forms.MessageBox]::Show("Downloaded and verified:`r`n$($download.FilePath)", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                    }
                 }
                 elseif ($download.Result -eq 'NoNewerVersion') {
                     [System.Windows.Forms.MessageBox]::Show("No newer $packageLabel is available from the manifest.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
@@ -556,7 +664,8 @@ function Show-PcnWinUpdateV2Ui {
             try {
                 $install = Invoke-PcnAppUpdateInstall -CachePath (Get-V2DownloadsFolder)
                 if ($install.Success -and $install.Result -eq 'InstallerHandoffStarted') {
-                    [System.Windows.Forms.MessageBox]::Show('Windows Installer was started. The app will close now.', 'Install Tool Update', 'OK', 'Information') | Out-Null
+                    Start-V2PostUpdateRelaunch -PackageType Msi -InstallerProcessId ([int]$install.ProcessId)
+                    [System.Windows.Forms.MessageBox]::Show('Windows Installer was started. The app will close now and relaunch after installation finishes.', 'Install Tool Update', 'OK', 'Information') | Out-Null
                     $dialog.Close()
                     $Owner.Close()
                 }
@@ -583,7 +692,12 @@ function Show-PcnWinUpdateV2Ui {
         })
 
         $dialog.Add_Shown({
-            Invoke-DialogCheck
+            if ($InitialCheck) {
+                Update-DialogFromCheck -CheckResult $InitialCheck
+            }
+            else {
+                Invoke-DialogCheck
+            }
         })
 
         $dialog.ShowDialog($Owner) | Out-Null
@@ -774,6 +888,12 @@ function Show-PcnWinUpdateV2Ui {
         LogFilePath = $null
         LogFileOffset = 0L
         LogLoadedLineCount = 0
+        ToolUpdateCheckProcess = $null
+        ToolUpdateOutPath = $null
+        ToolUpdateErrPath = $null
+        ToolUpdateAutoDialogShown = $false
+        OperationProcess = $null
+        OperationKind = $null
     }
 
     $smokeTimer = New-Object System.Windows.Forms.Timer
@@ -795,6 +915,18 @@ function Show-PcnWinUpdateV2Ui {
     $scanTimer.Interval = 750
     $scanTimer.Add_Tick({
         Complete-V2UpdatePreviewIfReady
+    })
+
+    $toolUpdateTimer = New-Object System.Windows.Forms.Timer
+    $toolUpdateTimer.Interval = 900
+    $toolUpdateTimer.Add_Tick({
+        Complete-V2ToolUpdateCheckIfReady
+    })
+
+    $operationTimer = New-Object System.Windows.Forms.Timer
+    $operationTimer.Interval = 1500
+    $operationTimer.Add_Tick({
+        Complete-V2OperationIfReady
     })
 
     $dashboard = $pages['Dashboard']
@@ -984,13 +1116,14 @@ function Show-PcnWinUpdateV2Ui {
     $followLogsButton = New-V2Button -Text 'Following' -X 140 -Y 72 -Width 110 -Height 30
     $bottomLogsButton = New-V2Button -Text 'Bottom' -X 260 -Y 72 -Width 110 -Height 30
     $openLogFileButton = New-V2Button -Text 'Open Log File' -X 380 -Y 72 -Width 125 -Height 30 -BorderColor $colors.Border
+    $exportLogsButton = New-V2Button -Text 'Export Bundle' -X 515 -Y 72 -Width 105 -Height 30 -BorderColor $colors.Border
     $filterBox = New-V2TextBox -X 610 -Y 72 -Width 230 -Height 28 -Text ''
     $filterBox.Anchor = 'Top,Right'
     $logFilterPlaceholder = 'Type to filter...'
     $filterBox.Text = $logFilterPlaceholder
     $filterBox.ForeColor = $colors.Muted
     $uiState.LogFilterPlaceholderActive = $true
-    $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $openLogFileButton, $filterBox))
+    $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $openLogFileButton, $exportLogsButton, $filterBox))
     $logBox = New-Object System.Windows.Forms.RichTextBox
     $logBox.ReadOnly = $true
     $logBox.BorderStyle = 'FixedSingle'
@@ -1124,6 +1257,21 @@ function Show-PcnWinUpdateV2Ui {
         }
     }
 
+    function Export-V2LogBundle {
+        try {
+            Set-V2FooterStatus -Message 'Creating public support log bundle...' -SystemText 'Collecting logs' -SystemColor $colors.Blue2
+            $form.Refresh()
+            $result = New-PcnCliLogPackage -Tail 500
+            Set-V2FooterStatus -Message "Log bundle created: $($result.ZipPath)" -SystemText 'Log bundle ready' -SystemColor $colors.Green
+            [System.Windows.Forms.MessageBox]::Show("Public support log bundle created:`r`n$($result.ZipPath)", 'Export Logs', 'OK', 'Information') | Out-Null
+            Start-Process -FilePath explorer.exe -ArgumentList ('/select,"{0}"' -f $result.ZipPath) | Out-Null
+        }
+        catch {
+            Set-V2FooterStatus -Message "Log bundle failed: $($_.Exception.Message)" -SystemText 'Log export failed' -SystemColor $colors.Orange
+            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Export Logs', 'OK', 'Warning') | Out-Null
+        }
+    }
+
     function Refresh-V2Logs {
         param([switch]$ScrollToEnd)
 
@@ -1185,8 +1333,8 @@ function Show-PcnWinUpdateV2Ui {
     }
 
     function Set-V2ResponsiveLayout {
-        $pageW = [Math]::Max(650, $content.ClientSize.Width)
-        $pageH = [Math]::Max(470, $content.ClientSize.Height)
+        $pageW = [Math]::Max(1, ($content.ClientSize.Width - 8))
+        $pageH = [Math]::Max(1, ($content.ClientSize.Height - 8))
 
         $tabCount = [Math]::Max(1, $tabButtons.Count)
         $tabW = [Math]::Max(130, [int][Math]::Floor($tabHost.ClientSize.Width / $tabCount))
@@ -1198,18 +1346,21 @@ function Show-PcnWinUpdateV2Ui {
             }
         }
 
-        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 44 -Width $pageW -Height 150
+        $pages['Dashboard'].AutoScroll = $false
+        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 42 -Width $pageW -Height 132
         if ($pageW -ge 760) {
             $halfW = [int][Math]::Floor(($pageW - 16) / 2)
-            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 210 -Width $halfW -Height 150
-            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 210 -Width ($pageW - $halfW - 16) -Height 150
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 190 -Width $halfW -Height 128
+            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 190 -Width ($pageW - $halfW - 16) -Height 128
+            Set-V2ControlBounds -Control $repairCard -X 0 -Y 334 -Width $pageW -Height 100
         }
         else {
-            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 210 -Width $pageW -Height 130
-            Set-V2ControlBounds -Control $healthCard -X 0 -Y 356 -Width $pageW -Height 130
+            $pages['Dashboard'].AutoScroll = $true
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 190 -Width $pageW -Height 122
+            Set-V2ControlBounds -Control $healthCard -X 0 -Y 326 -Width $pageW -Height 122
+            Set-V2ControlBounds -Control $repairCard -X 0 -Y 462 -Width $pageW -Height 100
         }
-        Set-V2ControlBounds -Control $repairCard -X 0 -Y 502 -Width $pageW -Height 112
-        Set-V2ControlBounds -Control $dashboardResetButton -X ([Math]::Max(20, $repairCard.Width - 230)) -Y 42 -Width 190 -Height 36
+        Set-V2ControlBounds -Control $dashboardResetButton -X ([Math]::Max(20, $repairCard.Width - 230)) -Y 38 -Width 190 -Height 36
 
         Set-V2ControlBounds -Control $manualCard -X 0 -Y 0 -Width $pageW -Height 190
         Set-V2ControlBounds -Control $checkAvailableButton -X ([Math]::Max(20, $pageW - 476)) -Y 136 -Width 210 -Height 38
@@ -1324,8 +1475,14 @@ function Show-PcnWinUpdateV2Ui {
         }
 
         Set-V2ControlBounds -Control $logsCard -X 0 -Y 0 -Width $pageW -Height ([Math]::Max(380, $pageH - 4))
-        Set-V2ControlBounds -Control $logFilterLabel -X ([Math]::Max(520, $pageW - 260)) -Y 48 -Width 230 -Height 20
-        Set-V2ControlBounds -Control $filterBox -X ([Math]::Max(520, $pageW - 260)) -Y 72 -Width 230 -Height 28
+        $filterX = [Math]::Max(630, $pageW - 250)
+        $filterW = [Math]::Max(190, $pageW - $filterX - 20)
+        Set-V2ControlBounds -Control $logFilterLabel -X $filterX -Y 48 -Width $filterW -Height 20
+        Set-V2ControlBounds -Control $filterBox -X $filterX -Y 72 -Width $filterW -Height 28
+        $exportLogsButton.Visible = ($pageW -ge 850)
+        if ($exportLogsButton.Visible) {
+            Set-V2ControlBounds -Control $exportLogsButton -X 515 -Y 72 -Width 105 -Height 30
+        }
         Set-V2ControlBounds -Control $logBox -X 20 -Y 112 -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height ([Math]::Max(210, $logsCard.Height - 165))
         Set-V2ControlBounds -Control $logFooter -X 20 -Y ([Math]::Max(330, $logsCard.Height - 38)) -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height 24
 
@@ -1466,7 +1623,7 @@ function Show-PcnWinUpdateV2Ui {
             Save-PcnWinUpdateConfig -Config $config
             $engineScriptPath = Get-V2MainScriptPath
             Register-PcnWinUpdateScheduledTask -Config $config -ScriptPath $engineScriptPath
-            $footerLabel.Text = 'Schedule saved.'
+            Set-V2FooterStatus -Message 'Schedule saved.' -SystemText 'Schedule ready' -SystemColor $colors.Green
             Refresh-V2Status
         }
         catch {
@@ -1501,7 +1658,7 @@ function Show-PcnWinUpdateV2Ui {
 
             $dailyRadio.Checked = $true
             $startupCheck.Checked = $false
-            $footerLabel.Text = "Schedule cleared. Removed task(s): $(@($cleanup.Removed).Count)."
+            Set-V2FooterStatus -Message "Schedule cleared. Removed task(s): $(@($cleanup.Removed).Count)." -SystemText 'Schedule cleared' -SystemColor $colors.Green
             Load-V2ScheduleConfig
             Refresh-V2Status
             if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
@@ -1705,7 +1862,7 @@ function Show-PcnWinUpdateV2Ui {
         $state.LastMessage = $retry.Message
         $state.LastRebootRequired = $false
         Save-PcnWinUpdateState -State $state
-        $footerLabel.Text = $retry.Message
+        Set-V2FooterStatus -Message $retry.Message -SystemText 'Retry scheduled' -SystemColor $colors.Orange
         Refresh-V2Status
         if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
             Refresh-V2Logs -ScrollToEnd
@@ -1714,7 +1871,7 @@ function Show-PcnWinUpdateV2Ui {
 
     function Start-V2RunUpdates {
         if ($uiState.ScanProcess -and -not $uiState.ScanProcess.HasExited) {
-            $footerLabel.Text = 'A check is already running.'
+            Set-V2FooterStatus -Message 'A check is already running.' -SystemText 'Check running' -SystemColor $colors.Blue2
             return
         }
 
@@ -1737,7 +1894,7 @@ function Show-PcnWinUpdateV2Ui {
             )
 
             if ($answer -ne 'Yes') {
-                $footerLabel.Text = 'Windows Update run cancelled.'
+                Set-V2FooterStatus -Message 'Windows Update run cancelled.' -SystemText 'Cancelled' -SystemColor $colors.Orange
                 return
             }
         }
@@ -1753,10 +1910,10 @@ function Show-PcnWinUpdateV2Ui {
 
             if ($choice -eq 'Snooze') {
                 $allowStopBackgroundActivity = $true
-                $footerLabel.Text = 'Snoozing Windows Update activity.'
+                Set-V2FooterStatus -Message 'Snoozing Windows Update activity.' -SystemText 'Preparing run' -SystemColor $colors.Blue2
             }
             else {
-                $footerLabel.Text = 'Windows Update run cancelled.'
+                Set-V2FooterStatus -Message 'Windows Update run cancelled.' -SystemText 'Cancelled' -SystemColor $colors.Orange
                 return
             }
         }
@@ -1764,9 +1921,10 @@ function Show-PcnWinUpdateV2Ui {
         $engineScriptPath = Get-V2MainScriptPath
         $allow = if ($allowStopBackgroundActivity) { ' -AllowStopBackgroundActivity' } else { '' }
         $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode RunUpdates -Silent -RunType Manual {1}{2}' -f $engineScriptPath, $scopeArguments, $allow
-        Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath) | Out-Null
+        $process = Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath)
         Write-PcnWinUpdateLog -Message "V2 update run requested. Snooz: $allowStopBackgroundActivity. Scope: $scopeArguments. Engine: $engineScriptPath" -EventID 1084
-        $footerLabel.Text = if ($allowStopBackgroundActivity) { 'Snooz update run started.' } else { 'Windows Update run started.' }
+        $startedMessage = if ($allowStopBackgroundActivity) { 'Snooz update run started.' } else { 'Windows Update run started.' }
+        Watch-V2OperationProcess -Process $process -Kind 'Windows Update' -StartedMessage $startedMessage
     }
 
     function Start-V2ResetWindowsUpdate {
@@ -1783,8 +1941,8 @@ function Show-PcnWinUpdateV2Ui {
 
         $engineScriptPath = Get-V2MainScriptPath
         $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode ResetWindowsUpdate -ConfirmReset' -f $engineScriptPath
-        Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath) | Out-Null
-        $footerLabel.Text = 'Windows Update reset started.'
+        $process = Start-V2ToolProcess -Arguments $arguments -WorkingDirectory (Split-Path -Parent $engineScriptPath)
+        Watch-V2OperationProcess -Process $process -Kind 'Windows Update reset' -StartedMessage 'Windows Update reset started.'
     }
 
     function Start-V2DriverAudit {
@@ -1911,7 +2069,7 @@ function Show-PcnWinUpdateV2Ui {
         }
 
         if (-not $uiState.ScanProcess.HasExited) {
-            $footerLabel.Text = 'Scan is still running...'
+            Set-V2FooterStatus -Message 'Scan is still running...' -SystemText 'Checking updates' -SystemColor $colors.Blue2
             return
         }
 
@@ -1997,12 +2155,15 @@ function Show-PcnWinUpdateV2Ui {
                 $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). Included: $($scan.Total), discovered: $($scan.TotalDiscovered)."
             }
             $lastScanValue.Text = (Get-Date).ToString('dd-MMM HH:mm')
-            $footerLabel.Text = if ([int]$scan.Total -eq 0) {
+            $scanFooter = if ([int]$scan.Total -eq 0) {
                 'Check complete. No available updates found.'
             }
             else {
                 "Check complete. Important: $($scan.Important), Optional: $($scan.Optional), Drivers: $($scan.Drivers), Firmware skipped: $($scan.FirmwareSkipped)."
             }
+            $scanSystem = if ([int]$scan.Total -eq 0) { 'No updates found' } else { 'Updates found' }
+            $scanColor = if ([int]$scan.Total -eq 0) { $colors.Green } else { $colors.Orange }
+            Set-V2FooterStatus -Message $scanFooter -SystemText $scanSystem -SystemColor $scanColor
             Refresh-V2Status
             if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
                 Refresh-V2Logs -ScrollToEnd
@@ -2014,7 +2175,7 @@ function Show-PcnWinUpdateV2Ui {
             $driversCount.Text = '!'
             $firmwareSkippedCount.Text = '!'
             $availableSummary.Text = 'Check failed. Open Logs for details.'
-            $footerLabel.Text = "Preview scan failed: $($_.Exception.Message)"
+            Set-V2FooterStatus -Message "Preview scan failed: $($_.Exception.Message)" -SystemText 'Check failed' -SystemColor $colors.Orange
             [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
         }
         finally {
@@ -2035,7 +2196,7 @@ function Show-PcnWinUpdateV2Ui {
 
     function Invoke-V2UpdatePreview {
         if ($uiState.ScanProcess -and -not $uiState.ScanProcess.HasExited) {
-            $footerLabel.Text = 'A check is already running.'
+            Set-V2FooterStatus -Message 'A check is already running.' -SystemText 'Check running' -SystemColor $colors.Blue2
             return
         }
 
@@ -2050,7 +2211,7 @@ function Show-PcnWinUpdateV2Ui {
                 return
             }
 
-            $footerLabel.Text = 'Starting Windows Update check...'
+            Set-V2FooterStatus -Message 'Starting Windows Update check...' -SystemText 'Checking updates' -SystemColor $colors.Blue2
             $importantCount.Text = '...'
             $optionalCount.Text = '...'
             $driversCount.Text = '...'
@@ -2084,8 +2245,185 @@ function Show-PcnWinUpdateV2Ui {
             $driversCount.Text = '!'
             $firmwareSkippedCount.Text = '!'
             $availableSummary.Text = 'Check failed to start.'
-            $footerLabel.Text = "Update check failed to start: $($_.Exception.Message)"
+            Set-V2FooterStatus -Message "Update check failed to start: $($_.Exception.Message)" -SystemText 'Check failed' -SystemColor $colors.Orange
             [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
+        }
+    }
+
+    function Set-V2SidebarToolUpdateStatus {
+        param([object]$Check)
+
+        $latest = if ($Check.LatestPublicLabel) { [string]$Check.LatestPublicLabel } else { [string]$Check.LatestVersion }
+        if ([string]::IsNullOrWhiteSpace($latest)) {
+            $latest = 'Unknown'
+        }
+
+        $latestValueSide.Text = $latest
+        if ($Check.Result -eq 'UpdateAvailable') {
+            $toolStatusValue.Text = 'Update'
+            $toolStatusValue.ForeColor = $colors.Purple
+            Set-V2FooterStatus -Message "Tool update available: $latest." -SystemText 'Update available' -SystemColor $colors.Purple
+        }
+        elseif ($Check.Result -eq 'UpToDate') {
+            $toolStatusValue.Text = 'Up to date'
+            $toolStatusValue.ForeColor = $colors.Green
+            Set-V2FooterStatus -Message "Tool is up to date: $latest." -SystemText 'Up to date' -SystemColor $colors.Green
+        }
+        else {
+            $toolStatusValue.Text = 'Problem'
+            $toolStatusValue.ForeColor = $colors.Orange
+            Set-V2FooterStatus -Message "Tool update check returned: $($Check.Result)." -SystemText 'Update check issue' -SystemColor $colors.Orange
+        }
+    }
+
+    function Start-V2ToolUpdateAutoCheck {
+        if ($uiState.ToolUpdateCheckProcess -and -not $uiState.ToolUpdateCheckProcess.HasExited) {
+            return
+        }
+
+        try {
+            $toolStatusValue.Text = 'Checking'
+            $toolStatusValue.ForeColor = $colors.Orange
+            $latestValueSide.Text = 'Checking'
+
+            $paths = Initialize-PcnWinUpdateFolders
+            $checkId = [guid]::NewGuid().ToString('N')
+            $uiState.ToolUpdateOutPath = Join-Path $paths.LogRoot "ToolUpdateCheck-$checkId.json"
+            $uiState.ToolUpdateErrPath = Join-Path $paths.LogRoot "ToolUpdateCheck-$checkId.err"
+            $engineScriptPath = Get-V2MainScriptPath
+            $packageType = Get-V2AppUpdatePackageType
+            $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode AppUpdateCheck -Json -UpdatePackageType {1}' -f $engineScriptPath, $packageType
+
+            $process = Start-Process -FilePath (Get-PcnPowershellPath) `
+                -ArgumentList $arguments `
+                -WorkingDirectory (Split-Path -Parent $engineScriptPath) `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $uiState.ToolUpdateOutPath `
+                -RedirectStandardError $uiState.ToolUpdateErrPath `
+                -PassThru
+
+            $uiState.ToolUpdateCheckProcess = $process
+            Write-PcnWinUpdateLog -Message "V2 automatic app update check started. PID: $($process.Id). Package: $packageType." -EventID 1095
+            $toolUpdateTimer.Start()
+        }
+        catch {
+            $latestValueSide.Text = 'Unavailable'
+            $toolStatusValue.Text = 'Offline'
+            $toolStatusValue.ForeColor = $colors.Orange
+            Write-PcnWinUpdateLog -Message "Automatic app update check failed to start: $($_.Exception.Message)" -EntryType Warning -EventID 1095
+        }
+    }
+
+    function Complete-V2ToolUpdateCheckIfReady {
+        if (-not $uiState.ToolUpdateCheckProcess) {
+            $toolUpdateTimer.Stop()
+            return
+        }
+
+        if (-not $uiState.ToolUpdateCheckProcess.HasExited) {
+            return
+        }
+
+        $toolUpdateTimer.Stop()
+        try {
+            $raw = ''
+            if ($uiState.ToolUpdateOutPath -and (Test-Path -LiteralPath $uiState.ToolUpdateOutPath -PathType Leaf)) {
+                $raw = Get-Content -LiteralPath $uiState.ToolUpdateOutPath -Raw -ErrorAction Stop
+            }
+
+            if ([string]::IsNullOrWhiteSpace($raw)) {
+                $stderr = ''
+                if ($uiState.ToolUpdateErrPath -and (Test-Path -LiteralPath $uiState.ToolUpdateErrPath -PathType Leaf)) {
+                    $stderr = Get-Content -LiteralPath $uiState.ToolUpdateErrPath -Raw -ErrorAction SilentlyContinue
+                }
+
+                throw "Tool update check did not return JSON. $stderr"
+            }
+
+            $check = ConvertFrom-V2ProcessJsonOutput -RawOutput $raw -Context 'Tool update check'
+            Set-V2SidebarToolUpdateStatus -Check $check
+            if ($check.Result -eq 'UpdateAvailable' -and -not [bool]$uiState.ToolUpdateAutoDialogShown) {
+                $uiState.ToolUpdateAutoDialogShown = $true
+                Show-V2ToolUpdateDialog -Owner $form -InitialCheck $check -AutomaticNotification
+            }
+        }
+        catch {
+            $latestValueSide.Text = 'Unavailable'
+            $toolStatusValue.Text = 'Offline'
+            $toolStatusValue.ForeColor = $colors.Orange
+            Write-PcnWinUpdateLog -Message "Automatic app update check failed: $($_.Exception.Message)" -EntryType Warning -EventID 1095
+        }
+        finally {
+            if ($uiState.ToolUpdateCheckProcess) {
+                $uiState.ToolUpdateCheckProcess.Dispose()
+            }
+
+            foreach ($path in @($uiState.ToolUpdateOutPath, $uiState.ToolUpdateErrPath)) {
+                if ($path -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+                    Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+                }
+            }
+
+            $uiState.ToolUpdateCheckProcess = $null
+            $uiState.ToolUpdateOutPath = $null
+            $uiState.ToolUpdateErrPath = $null
+        }
+    }
+
+    function Watch-V2OperationProcess {
+        param(
+            [System.Diagnostics.Process]$Process,
+            [string]$Kind,
+            [string]$StartedMessage
+        )
+
+        if (-not $Process) {
+            return
+        }
+
+        $uiState.OperationProcess = $Process
+        $uiState.OperationKind = $Kind
+        Set-V2FooterStatus -Message $StartedMessage -SystemText "$Kind running" -SystemColor $colors.Blue2
+        $operationTimer.Start()
+    }
+
+    function Complete-V2OperationIfReady {
+        if (-not $uiState.OperationProcess) {
+            $operationTimer.Stop()
+            return
+        }
+
+        if (-not $uiState.OperationProcess.HasExited) {
+            return
+        }
+
+        $operationTimer.Stop()
+        $kind = [string]$uiState.OperationKind
+        $exitCode = $uiState.OperationProcess.ExitCode
+        try {
+            $uiState.OperationProcess.Dispose()
+        }
+        catch {
+        }
+
+        $uiState.OperationProcess = $null
+        $uiState.OperationKind = $null
+
+        try {
+            Refresh-V2Status
+            $state = Get-PcnWinUpdateState
+            $result = if ($state.LastResult) { [string]$state.LastResult } else { "Exit code $exitCode" }
+            $message = if ($state.LastMessage) { [string]$state.LastMessage } else { "$kind finished with exit code $exitCode." }
+            $statusColor = if ($exitCode -eq 0) { $colors.Green } else { $colors.Orange }
+            $systemText = if ($exitCode -eq 0) { "$kind complete" } else { "$kind warning" }
+            Set-V2FooterStatus -Message "$kind complete: $message" -SystemText $systemText -SystemColor $statusColor
+            Write-PcnWinUpdateLog -Message "V2 $kind background process completed. Exit code: $exitCode. Result: $result." -EventID 1086
+            if ($pages['Logs'].Visible -and [bool]$uiState.LogFollow) {
+                Refresh-V2Logs -ScrollToEnd
+            }
+        }
+        catch {
+            Set-V2FooterStatus -Message "$kind completed, but status refresh failed: $($_.Exception.Message)" -SystemText "$kind complete" -SystemColor $colors.Orange
         }
     }
 
@@ -2095,29 +2433,19 @@ function Show-PcnWinUpdateV2Ui {
             $toolStatusValue.ForeColor = $colors.Orange
             $form.Refresh()
             $check = Invoke-PcnAppUpdateCheck -PackageType (Get-V2AppUpdatePackageType)
-            $latest = if ($check.LatestPublicLabel) { [string]$check.LatestPublicLabel } else { [string]$check.LatestVersion }
-            $latestValueSide.Text = $latest
-            if ($check.Result -eq 'UpdateAvailable') {
-                $toolStatusValue.Text = 'Update'
-                $toolStatusValue.ForeColor = $colors.Purple
-            }
-            elseif ($check.Result -eq 'UpToDate') {
-                $toolStatusValue.Text = 'Up to date'
-                $toolStatusValue.ForeColor = $colors.Green
-            }
-            else {
-                $toolStatusValue.Text = 'Problem'
-                $toolStatusValue.ForeColor = $colors.Orange
-            }
+            Set-V2SidebarToolUpdateStatus -Check $check
+            return $check
         }
         catch {
             $latestValueSide.Text = 'Unavailable'
             $toolStatusValue.Text = 'Offline'
             $toolStatusValue.ForeColor = $colors.Orange
+            Set-V2FooterStatus -Message "Tool update check failed: $($_.Exception.Message)" -SystemText 'Update check failed' -SystemColor $colors.Orange
+            return $null
         }
     }
 
-    $sidebarUpdateButton.Add_Click({ Show-V2ToolUpdateDialog -Owner $form; Check-V2ToolUpdateInline })
+    $sidebarUpdateButton.Add_Click({ Show-V2ToolUpdateDialog -Owner $form; [void](Check-V2ToolUpdateInline) })
     $settingsButton.Add_Click({ Show-V2Page -Name 'Schedule' })
     $helpButton.Add_Click({ Start-Process -FilePath 'https://help.pcninja.pro' | Out-Null })
     $checkAvailableButton.Add_Click({ Invoke-V2UpdatePreview })
@@ -2140,10 +2468,11 @@ function Show-PcnWinUpdateV2Ui {
     $viewFullReportButton.Add_Click({ Open-V2DriverReports })
     $refreshLogsButton.Add_Click({ Refresh-V2Logs })
     $openLogFileButton.Add_Click({ Open-V2LogFile })
+    $exportLogsButton.Add_Click({ Export-V2LogBundle })
     $followLogsButton.Add_Click({
         $uiState.LogFollow = -not [bool]$uiState.LogFollow
         $followLogsButton.Text = if ([bool]$uiState.LogFollow) { 'Following' } else { 'Follow' }
-        $footerLabel.Text = if ([bool]$uiState.LogFollow) { 'Log follow enabled.' } else { 'Log follow paused.' }
+        Set-V2FooterStatus -Message $(if ([bool]$uiState.LogFollow) { 'Log follow enabled.' } else { 'Log follow paused.' }) -SystemText $(if ([bool]$uiState.LogFollow) { 'Live logs' } else { 'Log follow paused' }) -SystemColor $colors.Green
         if ([bool]$uiState.LogFollow) {
             Refresh-V2Logs -ScrollToEnd
         }
@@ -2170,9 +2499,19 @@ function Show-PcnWinUpdateV2Ui {
         $smokeTimer.Stop()
         $logFollowTimer.Stop()
         $scanTimer.Stop()
+        $toolUpdateTimer.Stop()
+        $operationTimer.Stop()
         if ($uiState.ScanProcess) {
             $uiState.ScanProcess.Dispose()
             $uiState.ScanProcess = $null
+        }
+        if ($uiState.ToolUpdateCheckProcess) {
+            $uiState.ToolUpdateCheckProcess.Dispose()
+            $uiState.ToolUpdateCheckProcess = $null
+        }
+        if ($uiState.OperationProcess) {
+            $uiState.OperationProcess.Dispose()
+            $uiState.OperationProcess = $null
         }
     })
 
@@ -2191,6 +2530,8 @@ function Show-PcnWinUpdateV2Ui {
             $smokeTimer.Start()
             return
         }
+
+        Start-V2ToolUpdateAutoCheck
     })
 
     [void][System.Windows.Forms.Application]::Run($form)

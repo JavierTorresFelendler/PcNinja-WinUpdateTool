@@ -1,17 +1,18 @@
-﻿# PcNinja WinUpdate Tool RC20
+﻿# PcNinja WinUpdate Tool V2.0.0-RC17
 
-RC20 adds selectable Light/Dark themes and applies the PcNinja dark style with blue primary accents and red risk accents.
+RC17 focuses on making the V2 public release flow smoother: automatic GitHub update status, user-approved update popups, MSI/portable restart handoff, cleaner Dashboard sizing, and a support log bundle export.
 
-The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior are otherwise unchanged from RC18.
+The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
-## New In RC20
+## New In RC17
 
-- Adds a `Theme` selector in Dashboard -> Run Options.
-- Keeps `Light` as the current default look.
-- Adds `Dark` with PcNinja purple, blue primary accents, and red risk/attention accents.
-- Renames the driver tab to `Drivers`.
-- Lowers Dashboard, Updates, Schedule, and Drivers content for a more centered layout.
-- Removes the PcNinja tools frame while keeping the links and password field.
+- Automatically checks the GitHub update manifest after the UI opens.
+- Shows a version-aware update dialog only when a newer release is available.
+- Starts a relaunch watcher for MSI updates so the app closes for installation and opens again after the installer finishes.
+- Downloads portable EXE updates beside the current portable file, then closes the old UI and starts the new EXE.
+- Removes unwanted Dashboard scrollbars in the normal window size.
+- Adds a public support log bundle export button in Logs.
+- Updates footer result status after scans and background runs complete.
 
 ## New In RC18
 
@@ -20,7 +21,7 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - Caches short-lived GUI status checks so switching back to Dashboard does not immediately re-query Windows Update, Task Scheduler, and reboot state.
 - Keeps explicit Refresh, schedule changes, and finished update runs using fresh status checks.
 
-## New In RC17
+## Earlier RC17 UI Note
 
 - Shortens the Windows Update snooze dialog buttons to `Snooz to run`, `Retry in 5 min`, and `Cancel`.
 

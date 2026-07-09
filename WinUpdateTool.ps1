@@ -99,8 +99,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC16'
-        Version = '2.0.15.0'
+        PublicLabel = 'V2.0.0-RC17'
+        Version = '2.0.16.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
     }
@@ -1553,7 +1553,8 @@ if ($Mode -in @('DriverReport', 'DriverAudit')) {
     }
 }
 
-if (-not (Test-PcnAdministrator)) {
+$skipAdminGateForSmoke = ([string]$env:PCNINJA_V2_UI_SMOKE -eq '1')
+if (-not (Test-PcnAdministrator) -and -not $skipAdminGateForSmoke) {
     if ($Mode -eq 'UI') {
         Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.MessageBox]::Show(
