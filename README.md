@@ -1,11 +1,15 @@
-﻿# PcNinja WinUpdate Tool V2.0.0-RC17
+﻿# PcNinja WinUpdate Tool V2.0.0-RC18
 
-RC17 focuses on making the V2 public release flow smoother: automatic GitHub update status, user-approved update popups, MSI/portable restart handoff, cleaner Dashboard sizing, and a support log bundle export.
+RC18 focuses on tightening the public-ready V2 UI: version metadata alignment, cleaner resize behavior, English-only date labels, and steadier log following.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
-## New In RC17
+## New In RC18
 
+- Aligns the public label and MSI/ProductVersion metadata for the next package.
+- Uses invariant English date formatting in the V2 UI even on non-English Windows locales.
+- Enables double buffering on the V2 form, panels, and cards to reduce resize/redraw artifacts.
+- Keeps long log lines on one line with horizontal scrolling so live-follow does not jump during wrapped lines.
 - Automatically checks the GitHub update manifest after the UI opens.
 - Shows a version-aware update dialog only when a newer release is available.
 - Starts a relaunch watcher for MSI updates so the app closes for installation and opens again after the installer finishes.
@@ -14,7 +18,7 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - Adds a public support log bundle export button in Logs.
 - Updates footer result status after scans and background runs complete.
 
-## New In RC18
+## Earlier RC18 Startup Work
 
 - Shows the window first, then loads settings, schedule status, restart status, dashboard status, and logs in short deferred steps.
 - Adds clear loading text in the footer during startup and delayed tab refreshes.

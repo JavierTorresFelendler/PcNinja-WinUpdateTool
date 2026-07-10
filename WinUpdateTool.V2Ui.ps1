@@ -27,6 +27,7 @@ function Show-PcnWinUpdateV2Ui {
     $fontTitle = New-Object System.Drawing.Font('Segoe UI Semibold', 12, [System.Drawing.FontStyle]::Bold)
     $fontHero = New-Object System.Drawing.Font('Segoe UI Semibold', 18, [System.Drawing.FontStyle]::Bold)
     $fontMono = New-Object System.Drawing.Font('Consolas', 9)
+    $invariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
 
     function New-V2Point([int]$X, [int]$Y) {
         return New-Object System.Drawing.Point($X, $Y)
@@ -34,6 +35,24 @@ function Show-PcnWinUpdateV2Ui {
 
     function New-V2Size([int]$Width, [int]$Height) {
         return New-Object System.Drawing.Size($Width, $Height)
+    }
+
+    function Enable-V2DoubleBuffering {
+        param([System.Windows.Forms.Control]$Control)
+
+        if (-not $Control) {
+            return
+        }
+
+        try {
+            $property = [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'NonPublic, Instance')
+            if ($property) {
+                $property.SetValue($Control, $true, $null)
+            }
+        }
+        catch {
+            $null = $_
+        }
     }
 
     function Add-V2BorderPaint {
@@ -113,6 +132,7 @@ function Show-PcnWinUpdateV2Ui {
         $panel.Location = New-V2Point $X $Y
         $panel.Size = New-V2Size $Width $Height
         $panel.Margin = New-Object System.Windows.Forms.Padding(0)
+        Enable-V2DoubleBuffering -Control $panel
         Add-V2BorderPaint -Control $panel
 
         if (-not [string]::IsNullOrWhiteSpace($Title)) {
@@ -310,11 +330,15 @@ function Show-PcnWinUpdateV2Ui {
                 return 'Not yet'
             }
 
-            return $date.ToString('dd-MMM HH:mm')
+            return $date.ToString('dd-MMM HH:mm', $invariantCulture)
         }
         catch {
             return 'Not yet'
         }
+    }
+
+    function Format-V2Now {
+        return (Get-Date).ToString('dd-MMM HH:mm', $invariantCulture)
     }
 
     function Get-V2OsSummary {
@@ -711,6 +735,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $form.Font = $fontBase
     $form.Size = New-V2Size 1180 735
     $form.MinimumSize = New-V2Size 1050 650
+    Enable-V2DoubleBuffering -Control $form
 
     $iconPath = Join-Path $PSScriptRoot 'assets\PcNinja.ico'
     if (Test-Path -LiteralPath $iconPath) {
@@ -727,6 +752,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $header.Location = New-V2Point 0 0
     $header.Size = New-V2Size 1180 44
     $header.Anchor = 'Top,Left,Right'
+    Enable-V2DoubleBuffering -Control $header
     $form.Controls.Add($header)
 
     $logo = New-Object System.Windows.Forms.PictureBox
@@ -794,6 +820,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $tabHost.Location = New-V2Point 280 54
     $tabHost.Size = New-V2Size 880 42
     $tabHost.Anchor = 'Top,Left,Right'
+    Enable-V2DoubleBuffering -Control $tabHost
     $form.Controls.Add($tabHost)
 
     $content = New-Object System.Windows.Forms.Panel
@@ -801,6 +828,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $content.Location = New-V2Point 280 104
     $content.Size = New-V2Size 880 570
     $content.Anchor = 'Top,Bottom,Left,Right'
+    Enable-V2DoubleBuffering -Control $content
     $form.Controls.Add($content)
 
     $pages = @{}
@@ -810,6 +838,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $page.Dock = 'Fill'
         $page.AutoScroll = $true
         $page.Visible = $false
+        Enable-V2DoubleBuffering -Control $page
         $content.Controls.Add($page)
         $pages[$name] = $page
     }
@@ -1133,8 +1162,8 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $logBox.Location = New-V2Point 20 112
     $logBox.Size = New-V2Size 820 345
     $logBox.Anchor = 'Top,Bottom,Left,Right'
-    $logBox.WordWrap = $true
-    $logBox.ScrollBars = 'ForcedVertical'
+    $logBox.WordWrap = $false
+    $logBox.ScrollBars = 'ForcedBoth'
     $logBox.HideSelection = $false
     $logsCard.Controls.Add($logBox)
     $logFooter = New-V2Label -Text 'Log file: WinUpdateTool.log' -X 20 -Y 466 -Width 600 -Height 24 -Font $fontSmall -ForeColor $colors.Muted
@@ -1489,6 +1518,8 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         foreach ($page in $pages.Values) {
             $page.Invalidate()
         }
+        $content.Invalidate($true)
+        $form.Invalidate($true)
     }
 
     function Refresh-V2Status {
@@ -1950,7 +1981,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $footerLabel.Text = 'Creating driver audit...'
             $form.Refresh()
             $report = Export-PcnDriverInventoryReport
-            $auditStatus.Text = "Last audit: $(Get-Date -Format 'dd-MMM HH:mm')"
+            $auditStatus.Text = "Last audit: $(Format-V2Now)"
             $reportSummary.Text = "Devices scanned: $($report.TotalDevices)`r`nDriver candidates: $($report.CandidateDevices)`r`nAudit candidates: $($report.AuditCandidateDevices)`r`nHigh priority: $($report.HighPriorityAuditCandidates)"
             $footerLabel.Text = 'Driver audit created.'
             [System.Windows.Forms.MessageBox]::Show("Driver audit created.`r`n$($report.CsvPath)", 'Driver Audit', 'OK', 'Information') | Out-Null
@@ -2149,12 +2180,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $firmwareSkippedCount.Text = [string]$scan.FirmwareSkipped
             $uiState.LastPreviewItems = @($scan.Items)
             if ([int]$scan.Total -eq 0) {
-                $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). No available updates for this machine."
+                $availableSummary.Text = "Last check: $(Format-V2Now). No available updates for this machine."
             }
             else {
-                $availableSummary.Text = "Last check: $(Get-Date -Format 'dd-MMM HH:mm'). Included: $($scan.Total), discovered: $($scan.TotalDiscovered)."
+                $availableSummary.Text = "Last check: $(Format-V2Now). Included: $($scan.Total), discovered: $($scan.TotalDiscovered)."
             }
-            $lastScanValue.Text = (Get-Date).ToString('dd-MMM HH:mm')
+            $lastScanValue.Text = Format-V2Now
             $scanFooter = if ([int]$scan.Total -eq 0) {
                 'Check complete. No available updates found.'
             }
