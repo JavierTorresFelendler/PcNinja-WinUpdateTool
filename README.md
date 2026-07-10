@@ -1,12 +1,12 @@
-﻿# PcNinja WinUpdate Tool V2.0.0-RC18
+# PcNinja WinUpdate Tool V2.0.0-RC19
 
-RC18 focuses on tightening the public-ready V2 UI: version metadata alignment, cleaner resize behavior, English-only date labels, and steadier log following.
+RC19 focuses on tightening the public-ready V2 UI: MSI version metadata alignment, cleaner resize behavior, English-only date labels, and steadier log following.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
-## New In RC18
+## New In RC19
 
-- Aligns the public label and MSI/ProductVersion metadata for the next package.
+- Aligns the public label and MSI/ProductVersion metadata so Windows uninstall views match the RC build.
 - Uses invariant English date formatting in the V2 UI even on non-English Windows locales.
 - Enables double buffering on the V2 form, panels, and cards to reduce resize/redraw artifacts.
 - Keeps long log lines on one line with horizontal scrolling so live-follow does not jump during wrapped lines.

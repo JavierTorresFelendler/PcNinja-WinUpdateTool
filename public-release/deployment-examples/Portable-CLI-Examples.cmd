@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "PORTABLE=%~dp0..\PcNinja-WinUpdateTool-V2.0.0-RC18-Portable.exe"
+set "PORTABLE=%~dp0..\PcNinja-WinUpdateTool-V2.0.0-RC19-Portable.exe"
 "%PORTABLE%" /?
 "%PORTABLE%" -Mode Status -Json
 "%PORTABLE%" -Mode DriverAudit -Json

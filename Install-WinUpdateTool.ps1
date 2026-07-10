@@ -28,7 +28,7 @@ $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
 $installAssetsDir = Join-Path $installDir 'assets'
 $appIconPath = Join-Path $installAssetsDir 'PcNinja.ico'
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PcNinja WinUpdate Tool'
-$appVersion = '2.0.17.0'
+$appVersion = '2.0.19.0'
 $versionFile = Join-Path $sourceDir 'version.json'
 
 if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
@@ -39,7 +39,7 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
         }
     }
     catch {
-        $appVersion = '2.0.17.0'
+        $appVersion = '2.0.19.0'
     }
 }
 

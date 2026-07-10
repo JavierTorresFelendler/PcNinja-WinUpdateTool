@@ -980,9 +980,9 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $dashboard.Controls.Add($healthCard)
 
     $repairCard = New-V2Card -X 0 -Y 376 -Width 870 -Height 112 -Title 'Repair Windows Update'
-    $repairCard.Controls.Add((New-V2Label -Text 'Use this only when Windows Update appears stuck scanning, downloading, or installing.' -X 20 -Y 44 -Width 560 -Height 24 -ForeColor $colors.Muted))
+    $repairNote = New-V2Label -Text 'Use this only when Windows Update appears stuck scanning, downloading, or installing.' -X 20 -Y 44 -Width 560 -Height 44 -ForeColor $colors.Muted
     $dashboardResetButton = New-V2Button -Text 'Reset Windows Update' -X 640 -Y 42 -Width 190 -Height 36 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
-    $repairCard.Controls.Add($dashboardResetButton)
+    $repairCard.Controls.AddRange([System.Windows.Forms.Control[]]@($repairNote, $dashboardResetButton))
     $dashboard.Controls.Add($repairCard)
 
     $updates = $pages['Updates']
@@ -1071,17 +1071,17 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $wakeCard.Controls.AddRange([System.Windows.Forms.Control[]]@($startupCheck, $startupDelayLabel, $startupDelayCombo, $wakeCheck, $missedCheck))
     $schedule.Controls.Add($wakeCard)
 
-    $retryCard = New-V2Card -X 0 -Y 374 -Width 870 -Height 110 -Title 'Retry Policy'
+    $retryCard = New-V2Card -X 0 -Y 374 -Width 870 -Height 136 -Title 'Retry Policy'
     $retryCard.Anchor = 'Top,Left,Right'
-    $retryCard.Controls.Add((New-V2Label -Text 'Configure how to handle failures and retries.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted))
-    $retryCard.Controls.Add((New-V2Label -Text 'Retry failed updates' -X 20 -Y 74 -Width 145 -Height 24))
+    $retryIntroLabel = New-V2Label -Text 'Configure how to handle failures and retries.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted
+    $retryAttemptsLabel = New-V2Label -Text 'Retry failed updates' -X 20 -Y 74 -Width 145 -Height 24
     $retryAttemptsCombo = New-V2ComboBox -X 168 -Y 70 -Width 145 -Items @('0 times', '1 time', '3 times', '5 times') -Selected '3 times'
-    $retryCard.Controls.Add((New-V2Label -Text 'Retry interval' -X 340 -Y 74 -Width 105 -Height 24))
+    $retryIntervalLabel = New-V2Label -Text 'Retry interval' -X 340 -Y 74 -Width 105 -Height 24
     $retryIntervalCombo = New-V2ComboBox -X 448 -Y 70 -Width 145 -Items @('5 minutes', '15 minutes', '60 minutes') -Selected '5 minutes'
-    $retryCard.Controls.Add((New-V2Label -Text 'On repeated failure' -X 565 -Y 74 -Width 135 -Height 24))
-    $retryFailureCombo = New-V2ComboBox -X 704 -Y 70 -Width 144 -Items @('Snooz and retry later', 'Stop after retries') -Selected 'Snooz and retry later'
+    $retryFailureLabel = New-V2Label -Text 'On repeated failure' -X 20 -Y 104 -Width 145 -Height 24
+    $retryFailureCombo = New-V2ComboBox -X 168 -Y 100 -Width 210 -Items @('Snooz and retry later', 'Stop after retries') -Selected 'Snooz and retry later'
     $retryFailureCombo.Anchor = 'Top,Right'
-    $retryCard.Controls.AddRange([System.Windows.Forms.Control[]]@($retryAttemptsCombo, $retryIntervalCombo, $retryFailureCombo))
+    $retryCard.Controls.AddRange([System.Windows.Forms.Control[]]@($retryIntroLabel, $retryAttemptsLabel, $retryAttemptsCombo, $retryIntervalLabel, $retryIntervalCombo, $retryFailureLabel, $retryFailureCombo))
     $schedule.Controls.Add($retryCard)
 
     $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 390 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
@@ -1118,11 +1118,11 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $pcnLink.Font = $fontTitle
     }
 
-    $toolsCard.Controls.Add((New-V2Label -Text 'File password' -X 620 -Y 58 -Width 190 -Height 24 -ForeColor $colors.Muted))
+    $passwordLabel = New-V2Label -Text 'File password' -X 620 -Y 58 -Width 190 -Height 24 -ForeColor $colors.Muted
     $passwordBox = New-V2TextBox -X 620 -Y 88 -Width 190 -Text 'JavierTorres'
     $passwordBox.ReadOnly = $true
     $passwordBox.TextAlign = 'Center'
-    $toolsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink, $passwordBox))
+    $toolsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink, $passwordLabel, $passwordBox))
     $drivers.Controls.Add($toolsCard)
 
     $sourcesCard = New-V2Card -X 0 -Y 348 -Width 870 -Height 150 -Title 'Manufacturer Sources (Reference Only)'
@@ -1376,20 +1376,32 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
 
         $pages['Dashboard'].AutoScroll = $false
-        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 42 -Width $pageW -Height 132
-        if ($pageW -ge 760) {
+        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 42 -Width $pageW -Height 124
+        Set-V2ControlBounds -Control $overviewStatus -X 108 -Y 52 -Width ([Math]::Max(260, $overviewCard.Width - 132)) -Height 30
+        Set-V2ControlBounds -Control $overviewSub -X 108 -Y 86 -Width ([Math]::Max(260, $overviewCard.Width - 132)) -Height 28
+        if ($pageW -ge 900) {
             $halfW = [int][Math]::Floor(($pageW - 16) / 2)
-            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 190 -Width $halfW -Height 128
-            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 190 -Width ($pageW - $halfW - 16) -Height 128
-            Set-V2ControlBounds -Control $repairCard -X 0 -Y 334 -Width $pageW -Height 100
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 184 -Width $halfW -Height 128
+            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 184 -Width ($pageW - $halfW - 16) -Height 128
+            Set-V2ControlBounds -Control $repairCard -X 0 -Y 328 -Width $pageW -Height 112
         }
         else {
-            $pages['Dashboard'].AutoScroll = $true
-            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 190 -Width $pageW -Height 122
-            Set-V2ControlBounds -Control $healthCard -X 0 -Y 326 -Width $pageW -Height 122
-            Set-V2ControlBounds -Control $repairCard -X 0 -Y 462 -Width $pageW -Height 100
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 184 -Width $pageW -Height 112
+            Set-V2ControlBounds -Control $healthCard -X 0 -Y 310 -Width $pageW -Height 126
+            Set-V2ControlBounds -Control $repairCard -X 0 -Y 450 -Width $pageW -Height 118
         }
-        Set-V2ControlBounds -Control $dashboardResetButton -X ([Math]::Max(20, $repairCard.Width - 230)) -Y 38 -Width 190 -Height 36
+        Set-V2ControlBounds -Control $scheduleSummaryText -X 20 -Y 48 -Width ([Math]::Max(240, $scheduleSummaryCard.Width - 40)) -Height 60
+        Set-V2ControlBounds -Control $healthText -X 70 -Y 52 -Width ([Math]::Max(180, $healthCard.Width - 92)) -Height 32
+        Set-V2ControlBounds -Control $healthSub -X 70 -Y 88 -Width ([Math]::Max(180, $healthCard.Width - 92)) -Height 44
+        if ($repairCard.Width -ge 650) {
+            $resetX = [Math]::Max(20, $repairCard.Width - 230)
+            Set-V2ControlBounds -Control $repairNote -X 20 -Y 44 -Width ([Math]::Max(260, $resetX - 40)) -Height 44
+            Set-V2ControlBounds -Control $dashboardResetButton -X $resetX -Y 42 -Width 190 -Height 36
+        }
+        else {
+            Set-V2ControlBounds -Control $repairNote -X 20 -Y 42 -Width ([Math]::Max(260, $repairCard.Width - 40)) -Height 38
+            Set-V2ControlBounds -Control $dashboardResetButton -X ([Math]::Max(20, $repairCard.Width - 230)) -Y 76 -Width 190 -Height 34
+        }
 
         Set-V2ControlBounds -Control $manualCard -X 0 -Y 0 -Width $pageW -Height 190
         Set-V2ControlBounds -Control $checkAvailableButton -X ([Math]::Max(20, $pageW - 476)) -Y 136 -Width 210 -Height 38
@@ -1404,64 +1416,53 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         if ($pageW -lt 820) {
             $nextCard.Visible = $false
             Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 160
-            Set-V2ControlBounds -Control $scheduleTimeCombo -X ([Math]::Max(170, $pageW - 190)) -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
-            Set-V2ControlBounds -Control $scheduleDayCombo -X ([Math]::Max(170, $pageW - 190)) -Y 92 -Width 145 -Height $scheduleDayCombo.Height
-            Set-V2ControlBounds -Control $scheduleMonthDayCombo -X ([Math]::Max(170, $pageW - 190)) -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
+            $scheduleComboX = [Math]::Min(300, [Math]::Max(170, $pageW - 190))
+            Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
+            Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
+            Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
             Set-V2ControlBounds -Control $wakeCard -X 0 -Y 176 -Width $pageW -Height 96
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 36 -Width 230 -Height 24
-            Set-V2ControlBounds -Control $startupDelayLabel -X ([Math]::Max(275, $pageW - 235)) -Y 36 -Width 96 -Height 24
-            Set-V2ControlBounds -Control $startupDelayCombo -X ([Math]::Max(380, $pageW - 125)) -Y 32 -Width 72 -Height $startupDelayCombo.Height
+            $startupDelayX = [Math]::Min(520, [Math]::Max(300, $pageW - 260))
+            Set-V2ControlBounds -Control $startupDelayLabel -X $startupDelayX -Y 36 -Width 96 -Height 24
+            Set-V2ControlBounds -Control $startupDelayCombo -X ($startupDelayX + 104) -Y 32 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 68 -Width 300 -Height 24
-            Set-V2ControlBounds -Control $missedCheck -X ([Math]::Max(360, $pageW - 300)) -Y 68 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 288 -Width $pageW -Height 128
+            Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(430, [Math]::Max(330, $pageW - 300))) -Y 68 -Width 260 -Height 24
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 288 -Width $pageW -Height 152
+            Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(260, $pageW - 40)) -Height 24
+            Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
-            Set-V2ControlBounds -Control $retryIntervalCombo -X ([Math]::Min(448, [Math]::Max(168, $pageW - 235))) -Y 70 -Width 145 -Height $retryIntervalCombo.Height
-            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 96 -Width ([Math]::Min(210, $pageW - 188)) -Height $retryFailureCombo.Height
-            foreach ($ctrl in $retryCard.Controls) {
-                if ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry failed updates') {
-                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 74 -Width 145 -Height 24
-                }
-                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'On repeated failure') {
-                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 100 -Width 135 -Height 24
-                }
-                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry interval') {
-                    Set-V2ControlBounds -Control $ctrl -X ([Math]::Min(340, [Math]::Max(20, $pageW - 345))) -Y 74 -Width 105 -Height 24
-                }
-            }
-            $buttonY = [Math]::Min(($pageH - 48), 432)
+            Set-V2ControlBounds -Control $retryIntervalLabel -X 340 -Y 74 -Width 105 -Height 24
+            Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
+            Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 108 -Width 145 -Height 24
+            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 104 -Width ([Math]::Min(250, $pageW - 188)) -Height $retryFailureCombo.Height
+            $buttonY = [Math]::Max(456, [Math]::Min(($pageH - 48), 532))
             Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 455)) -Y $buttonY -Width 210 -Height 38
             Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(240, $pageW - 225)) -Y $buttonY -Width 210 -Height 38
         }
         else {
             $nextCard.Visible = $true
-            $leftW = [Math]::Min(640, [Math]::Max(520, $pageW - 330))
+            $leftW = [Math]::Min(640, [Math]::Max(520, [int][Math]::Floor($pageW * 0.64)))
             Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $leftW -Height 220
-            Set-V2ControlBounds -Control $scheduleTimeCombo -X 230 -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
-            Set-V2ControlBounds -Control $scheduleDayCombo -X 230 -Y 92 -Width 145 -Height $scheduleDayCombo.Height
-            Set-V2ControlBounds -Control $scheduleMonthDayCombo -X 230 -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
+            $scheduleComboX = [Math]::Min(300, [Math]::Max(230, $leftW - 190))
+            Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
+            Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
+            Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
             Set-V2ControlBounds -Control $nextCard -X ($leftW + 20) -Y 0 -Width ($pageW - $leftW - 20) -Height 220
             Set-V2ControlBounds -Control $wakeCard -X 0 -Y 238 -Width $pageW -Height 118
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 42 -Width 230 -Height 24
             Set-V2ControlBounds -Control $startupDelayLabel -X 310 -Y 40 -Width 98 -Height 24
             Set-V2ControlBounds -Control $startupDelayCombo -X 414 -Y 36 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 78 -Width 300 -Height 24
-            Set-V2ControlBounds -Control $missedCheck -X 414 -Y 78 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 374 -Width $pageW -Height 110
+            Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(560, [Math]::Max(414, $pageW - 330))) -Y 78 -Width 260 -Height 24
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 374 -Width $pageW -Height 136
+            Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(360, $pageW - 40)) -Height 24
+            Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
+            Set-V2ControlBounds -Control $retryIntervalLabel -X 340 -Y 74 -Width 105 -Height 24
             Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
-            Set-V2ControlBounds -Control $retryFailureCombo -X ([Math]::Max(704, $pageW - 166)) -Y 70 -Width 144 -Height $retryFailureCombo.Height
-            foreach ($ctrl in $retryCard.Controls) {
-                if ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry failed updates') {
-                    Set-V2ControlBounds -Control $ctrl -X 20 -Y 74 -Width 145 -Height 24
-                }
-                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'Retry interval') {
-                    Set-V2ControlBounds -Control $ctrl -X 340 -Y 74 -Width 105 -Height 24
-                }
-                elseif ($ctrl -is [System.Windows.Forms.Label] -and $ctrl.Text -eq 'On repeated failure') {
-                    Set-V2ControlBounds -Control $ctrl -X ([Math]::Max(565, $pageW - 305)) -Y 74 -Width 135 -Height 24
-                }
-            }
-            $buttonY = [Math]::Max(506, $pageH - 50)
+            Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 104 -Width 145 -Height 24
+            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 100 -Width ([Math]::Min(260, $pageW - 188)) -Height $retryFailureCombo.Height
+            $buttonY = [Math]::Max(530, $pageH - 50)
             Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 480)) -Y $buttonY -Width 220 -Height 40
             Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(250, $pageW - 240)) -Y $buttonY -Width 220 -Height 40
         }
@@ -1481,7 +1482,9 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $pcnOfficeLink -X 20 -Y 110 -Width 225 -Height 24
             Set-V2ControlBounds -Control $pcnActivationLink -X 270 -Y 78 -Width 205 -Height 24
             Set-V2ControlBounds -Control $pcnWindowsLink -X 270 -Y 110 -Width 205 -Height 24
-            Set-V2ControlBounds -Control $passwordBox -X ([Math]::Max(20, $pageW - 220)) -Y 88 -Width 190 -Height 28
+            $passwordX = [Math]::Max(20, [Math]::Min(520, $pageW - 220))
+            Set-V2ControlBounds -Control $passwordLabel -X $passwordX -Y 58 -Width 190 -Height 24
+            Set-V2ControlBounds -Control $passwordBox -X $passwordX -Y 88 -Width 190 -Height 28
             Set-V2ControlBounds -Control $sourcesCard -X 0 -Y 450 -Width $pageW -Height 150
         }
         else {
@@ -1499,7 +1502,9 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $pcnOfficeLink -X 20 -Y 110 -Width 225 -Height 24
             Set-V2ControlBounds -Control $pcnActivationLink -X 290 -Y 78 -Width 205 -Height 24
             Set-V2ControlBounds -Control $pcnWindowsLink -X 290 -Y 110 -Width 205 -Height 24
-            Set-V2ControlBounds -Control $passwordBox -X ([Math]::Max(620, $pageW - 250)) -Y 88 -Width 190 -Height 28
+            $passwordX = [Math]::Min([Math]::Max(620, [int]($pageW * 0.62)), $pageW - 250)
+            Set-V2ControlBounds -Control $passwordLabel -X $passwordX -Y 58 -Width 190 -Height 24
+            Set-V2ControlBounds -Control $passwordBox -X $passwordX -Y 88 -Width 190 -Height 28
             Set-V2ControlBounds -Control $sourcesCard -X 0 -Y 348 -Width $pageW -Height 150
         }
 

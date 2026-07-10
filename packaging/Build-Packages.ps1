@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.17.0'
+    $Version = '2.0.19.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC18'
+    $PublicLabel = 'V2.0.0-RC19'
 }
 
 if (-not $Repository) {
@@ -579,7 +579,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Adds MSI relaunch handoff and portable EXE download-and-run handoff for user-approved tool updates.',
     '- Adds a public support log bundle export button in Logs.',
     '- Updates footer result status after scans and background runs complete.',
-    '- Aligns the public label and MSI/ProductVersion metadata for the next package.',
+    '- Aligns the public label and MSI/ProductVersion metadata so Windows uninstall views match the RC build.',
     '- Uses invariant English date formatting in the V2 UI even on non-English Windows locales.',
     '- Enables double buffering on the V2 form, panels, and cards to reduce resize/redraw artifacts.',
     '- Keeps long log lines on one line with horizontal scrolling so live-follow does not jump during wrapped lines.',
