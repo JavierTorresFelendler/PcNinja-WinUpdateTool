@@ -1,12 +1,16 @@
-# PcNinja WinUpdate Tool V2.0.0-RC19
+# PcNinja WinUpdate Tool V2.0.0-RC20
 
-RC19 focuses on tightening the public-ready V2 UI: MSI version metadata alignment, cleaner resize behavior, English-only date labels, and steadier log following.
+RC20 focuses on public-ready V2 UI polish: richer machine status, cleaner Updates layout, helpful PcNinja links, and stable tab resizing.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
-## New In RC19
+## New In RC20
 
-- Aligns the public label and MSI/ProductVersion metadata so Windows uninstall views match the RC build.
+- Adds host, CPU, RAM, and free-disk details to the V2 System Status sidebar.
+- Adds Remote Assistance and official PcNinja site links to the Updates helpful-links panel.
+- Moves `View List` into the Available Updates title row and rebalances the count layout.
+- Fixes top-tab resizing so Dashboard, Updates, Drivers, and Logs remain visible while resizing.
+- Keeps MSI/ProductVersion metadata aligned so Windows uninstall views match the RC build.
 - Uses invariant English date formatting in the V2 UI even on non-English Windows locales.
 - Enables double buffering on the V2 form, panels, and cards to reduce resize/redraw artifacts.
 - Keeps long log lines on one line with horizontal scrolling so live-follow does not jump during wrapped lines.

@@ -359,6 +359,56 @@ function Show-PcnWinUpdateV2Ui {
         }
     }
 
+    function Format-V2Gb {
+        param([object]$Bytes)
+
+        try {
+            $value = [double]$Bytes
+            if ($value -le 0) {
+                return '-'
+            }
+
+            return ('{0:N0} GB' -f ($value / 1GB))
+        }
+        catch {
+            return '-'
+        }
+    }
+
+    function Get-V2MachineSummary {
+        $summary = [ordered]@{
+            Host = $env:COMPUTERNAME
+            Hardware = 'Hardware unavailable'
+            Storage = 'Disk details unavailable'
+        }
+
+        try {
+            $computer = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+            $threads = [int]$computer.NumberOfLogicalProcessors
+            if ($threads -le 0) {
+                $threads = [int]$computer.NumberOfProcessors
+            }
+
+            $memory = Format-V2Gb -Bytes $computer.TotalPhysicalMemory
+            $summary.Hardware = ("{0} CPU threads | {1} RAM" -f $threads, $memory)
+        }
+        catch {
+            $summary.Hardware = 'CPU/RAM unavailable'
+        }
+
+        try {
+            $fixedDisks = @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" -ErrorAction Stop | Where-Object { $_.DeviceID -and $_.Size } | Sort-Object DeviceID | Select-Object -First 3)
+            if ($fixedDisks.Count -gt 0) {
+                $summary.Storage = (($fixedDisks | ForEach-Object { '{0} {1} free' -f $_.DeviceID, (Format-V2Gb -Bytes $_.FreeSpace) }) -join ' | ')
+            }
+        }
+        catch {
+            $summary.Storage = 'Disk details unavailable'
+        }
+
+        return [pscustomobject]$summary
+    }
+
     function Get-V2MainScriptPath {
         if ($script:PcnMainScriptPath -and (Test-Path -LiteralPath $script:PcnMainScriptPath -PathType Leaf)) {
             return $script:PcnMainScriptPath
@@ -781,38 +831,42 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $form.Controls.Add($sidebar)
 
     $osInfo = Get-V2OsSummary
+    $machineInfo = Get-V2MachineSummary
     $sidebar.Controls.Add((New-V2Label -Text ([string][char]0xE782) -X 16 -Y 46 -Width 24 -Height 24 -Font (New-Object System.Drawing.Font('Segoe MDL2 Assets', 14)) -ForeColor $colors.Blue2))
     $sidebar.Controls.Add((New-V2Label -Text 'Windows' -X 46 -Y 44 -Width 175 -Height 24 -Font $fontTitle))
-    $windowsLabel = New-V2Label -Text ("{0}`r`n{1} ({2})" -f $osInfo.Caption, $osInfo.Version, $osInfo.Build) -X 46 -Y 70 -Width 190 -Height 46 -Font $fontSmall -ForeColor $colors.Muted
-    $sidebar.Controls.Add($windowsLabel)
+    $windowsLabel = New-V2Label -Text ("{0}`r`n{1} ({2})" -f $osInfo.Caption, $osInfo.Version, $osInfo.Build) -X 46 -Y 68 -Width 190 -Height 42 -Font $fontSmall -ForeColor $colors.Muted
+    $hostValue = New-V2Label -Text ([string]$machineInfo.Host) -X 86 -Y 118 -Width 152 -Height 20 -Font $fontSmall -ForeColor $colors.Text -Align 'MiddleRight'
+    $hardwareValue = New-V2Label -Text ([string]$machineInfo.Hardware) -X 18 -Y 144 -Width 220 -Height 20 -Font $fontSmall -ForeColor $colors.Muted
+    $storageValue = New-V2Label -Text ([string]$machineInfo.Storage) -X 18 -Y 168 -Width 220 -Height 38 -Font $fontSmall -ForeColor $colors.Muted
+    $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($windowsLabel, (New-V2Label -Text 'Host' -X 18 -Y 118 -Width 60 -Height 20 -Font $fontSmall -ForeColor $colors.Muted), $hostValue, $hardwareValue, $storageValue))
 
-    $healthValue = New-V2Label -Text 'OK' -X 180 -Y 125 -Width 58 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
-    $lastScanValue = New-V2Label -Text 'Loading...' -X 130 -Y 154 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
-    $lastInstallValue = New-V2Label -Text 'Loading...' -X 130 -Y 183 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
-    $rebootValue = New-V2Label -Text 'Checking' -X 130 -Y 212 -Width 108 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
+    $healthValue = New-V2Label -Text 'OK' -X 180 -Y 226 -Width 58 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
+    $lastScanValue = New-V2Label -Text 'Loading...' -X 130 -Y 255 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
+    $lastInstallValue = New-V2Label -Text 'Loading...' -X 130 -Y 284 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
+    $rebootValue = New-V2Label -Text 'Checking' -X 130 -Y 313 -Width 108 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
 
-    $sidebar.Controls.Add((New-V2Label -Text 'Health' -X 18 -Y 125 -Width 110 -Height 22 -ForeColor $colors.Text))
-    $sidebar.Controls.Add((New-V2Label -Text 'Last Scan' -X 18 -Y 154 -Width 110 -Height 22 -ForeColor $colors.Text))
-    $sidebar.Controls.Add((New-V2Label -Text 'Last Install' -X 18 -Y 183 -Width 110 -Height 22 -ForeColor $colors.Text))
-    $sidebar.Controls.Add((New-V2Label -Text 'Reboot' -X 18 -Y 212 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Health' -X 18 -Y 226 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Last Scan' -X 18 -Y 255 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Last Install' -X 18 -Y 284 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Reboot' -X 18 -Y 313 -Width 110 -Height 22 -ForeColor $colors.Text))
     $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($healthValue, $lastScanValue, $lastInstallValue, $rebootValue))
 
     $divider1 = New-Object System.Windows.Forms.Panel
     $divider1.BackColor = $colors.Border
-    $divider1.Location = New-V2Point 16 252
+    $divider1.Location = New-V2Point 16 352
     $divider1.Size = New-V2Size 228 1
     $sidebar.Controls.Add($divider1)
 
-    $sidebar.Controls.Add((New-V2Label -Text 'PcNinja Tool' -X 18 -Y 270 -Width 160 -Height 24 -Font $fontTitle))
-    $installedValue = New-V2Label -Text $script:PcnToolPublicLabel -X 130 -Y 304 -Width 108 -Height 22 -Align 'MiddleRight'
-    $latestValueSide = New-V2Label -Text 'Check needed' -X 130 -Y 333 -Width 108 -Height 22 -Align 'MiddleRight'
-    $toolStatusValue = New-V2Label -Text 'Unknown' -X 130 -Y 362 -Width 108 -Height 22 -ForeColor $colors.Orange -Align 'MiddleRight'
-    $sidebar.Controls.Add((New-V2Label -Text 'Installed' -X 18 -Y 304 -Width 90 -Height 22))
-    $sidebar.Controls.Add((New-V2Label -Text 'Latest' -X 18 -Y 333 -Width 90 -Height 22))
-    $sidebar.Controls.Add((New-V2Label -Text 'Status' -X 18 -Y 362 -Width 90 -Height 22))
+    $sidebar.Controls.Add((New-V2Label -Text 'PcNinja Tool' -X 18 -Y 370 -Width 160 -Height 24 -Font $fontTitle))
+    $installedValue = New-V2Label -Text $script:PcnToolPublicLabel -X 130 -Y 404 -Width 108 -Height 22 -Align 'MiddleRight'
+    $latestValueSide = New-V2Label -Text 'Check needed' -X 130 -Y 433 -Width 108 -Height 22 -Align 'MiddleRight'
+    $toolStatusValue = New-V2Label -Text 'Unknown' -X 130 -Y 462 -Width 108 -Height 22 -ForeColor $colors.Orange -Align 'MiddleRight'
+    $sidebar.Controls.Add((New-V2Label -Text 'Installed' -X 18 -Y 404 -Width 90 -Height 22))
+    $sidebar.Controls.Add((New-V2Label -Text 'Latest' -X 18 -Y 433 -Width 90 -Height 22))
+    $sidebar.Controls.Add((New-V2Label -Text 'Status' -X 18 -Y 462 -Width 90 -Height 22))
     $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($installedValue, $latestValueSide, $toolStatusValue))
 
-    $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 402 -Width 228 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
+    $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 502 -Width 228 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
     $sidebar.Controls.Add($sidebarUpdateButton)
 
     $tabHost = New-Object System.Windows.Forms.Panel
@@ -1002,18 +1056,19 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $manualCard.Controls.AddRange([System.Windows.Forms.Control[]]@($checkAvailableButton, $installSelectedButton))
     $updates.Controls.Add($manualCard)
 
-    $availableCard = New-V2Card -X 0 -Y 206 -Width 870 -Height 120 -Title 'Available Updates'
-    $availableSummary = New-V2Label -Text 'No check has run yet.' -X 20 -Y 48 -Width 360 -Height 44 -ForeColor $colors.Muted
-    $viewUpdateListButton = New-V2Button -Text 'View List' -X 20 -Y 82 -Width 120 -Height 28 -BorderColor $colors.Border
+    $availableCard = New-V2Card -X 0 -Y 206 -Width 870 -Height 120 -Title ''
+    $availableTitle = New-V2Label -Text 'Available Updates' -X 16 -Y 10 -Width 150 -Height 26 -Font $fontTitle
+    $viewUpdateListButton = New-V2Button -Text 'View List' -X 176 -Y 9 -Width 112 -Height 28 -BorderColor $colors.Border
+    $availableSummary = New-V2Label -Text 'No check has run yet.' -X 20 -Y 50 -Width 360 -Height 44 -ForeColor $colors.Muted
     $importantCount = New-V2Label -Text '-' -X 455 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Orange -Align 'MiddleCenter'
     $optionalCount = New-V2Label -Text '-' -X 560 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Blue2 -Align 'MiddleCenter'
     $driversCount = New-V2Label -Text '-' -X 665 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Green -Align 'MiddleCenter'
     $firmwareSkippedCount = New-V2Label -Text '-' -X 770 -Y 42 -Width 60 -Height 34 -Font $fontHero -ForeColor $colors.Purple -Align 'MiddleCenter'
-    $availableCard.Controls.AddRange([System.Windows.Forms.Control[]]@($availableSummary, $viewUpdateListButton, $importantCount, $optionalCount, $driversCount, $firmwareSkippedCount))
-    $availableCard.Controls.Add((New-V2Label -Text 'Important' -X 442 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
-    $availableCard.Controls.Add((New-V2Label -Text 'Optional' -X 548 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
-    $availableCard.Controls.Add((New-V2Label -Text 'Drivers' -X 653 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
-    $availableCard.Controls.Add((New-V2Label -Text 'Firmware skipped' -X 744 -Y 78 -Width 120 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'))
+    $importantCaption = New-V2Label -Text 'Important' -X 442 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'
+    $optionalCaption = New-V2Label -Text 'Optional' -X 548 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'
+    $driversCaption = New-V2Label -Text 'Drivers' -X 653 -Y 78 -Width 86 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'
+    $firmwareSkippedCaption = New-V2Label -Text 'Firmware skipped' -X 744 -Y 78 -Width 120 -Height 20 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleCenter'
+    $availableCard.Controls.AddRange([System.Windows.Forms.Control[]]@($availableTitle, $viewUpdateListButton, $availableSummary, $importantCount, $optionalCount, $driversCount, $firmwareSkippedCount, $importantCaption, $optionalCaption, $driversCaption, $firmwareSkippedCaption))
     $updates.Controls.Add($availableCard)
 
     $restartCard = New-V2Card -X 0 -Y 342 -Width 870 -Height 90 -Title 'Restart State'
@@ -1023,9 +1078,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $restartCard.Controls.AddRange([System.Windows.Forms.Control[]]@($restartLabel, $restartNowButton, $restartDetailsButton))
     $updates.Controls.Add($restartCard)
 
-    $linksCard = New-V2Card -X 0 -Y 448 -Width 870 -Height 95 -Title 'Helpful Links'
-    $linksCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 20 -Y 54 -Width 260))
-    $linksCard.Controls.Add((New-V2LinkLabel -Text 'PcNinja Classes' -Url 'https://class.pcninja.pro' -X 430 -Y 54 -Width 220))
+    $linksCard = New-V2Card -X 0 -Y 448 -Width 870 -Height 108 -Title 'Helpful Links'
+    $imageLink = New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 20 -Y 52 -Width 220
+    $classesLink = New-V2LinkLabel -Text 'PcNinja Classes' -Url 'https://class.pcninja.pro' -X 250 -Y 52 -Width 170
+    $remoteAssistLink = New-V2LinkLabel -Text 'Remote Assistance' -Url 'https://help.pcninja.pro' -X 430 -Y 52 -Width 170
+    $officialSiteLink = New-V2LinkLabel -Text 'wWw.PcNinja.Pro' -Url 'https://www.PcNinja.Pro' -X 620 -Y 52 -Width 180
+    $linksCard.Controls.AddRange([System.Windows.Forms.Control[]]@($imageLink, $classesLink, $remoteAssistLink, $officialSiteLink))
     $updates.Controls.Add($linksCard)
 
     $schedule = $pages['Schedule']
@@ -1366,12 +1424,17 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $pageH = [Math]::Max(1, ($content.ClientSize.Height - 8))
 
         $tabCount = [Math]::Max(1, $tabButtons.Count)
-        $tabW = [Math]::Max(130, [int][Math]::Floor($tabHost.ClientSize.Width / $tabCount))
+        $tabW = [int][Math]::Floor($tabHost.ClientSize.Width / $tabCount)
+        $tabW = [Math]::Max(1, $tabW)
         $tabX = 0
-        foreach ($tabName in @('Dashboard', 'Updates', 'Drivers', 'Logs')) {
+        $tabIndex = 0
+        $tabOrder = @('Dashboard', 'Updates', 'Drivers', 'Logs')
+        foreach ($tabName in $tabOrder) {
             if ($tabButtons.ContainsKey($tabName)) {
-                Set-V2ControlBounds -Control $tabButtons[$tabName] -X $tabX -Y 0 -Width $tabW -Height 42
-                $tabX += $tabW
+                $tabIndex++
+                $thisTabW = if ($tabIndex -eq $tabCount) { [Math]::Max(1, $tabHost.ClientSize.Width - $tabX) } else { $tabW }
+                Set-V2ControlBounds -Control $tabButtons[$tabName] -X $tabX -Y 0 -Width $thisTabW -Height 42
+                $tabX += $thisTabW
             }
         }
 
@@ -1407,11 +1470,31 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         Set-V2ControlBounds -Control $checkAvailableButton -X ([Math]::Max(20, $pageW - 476)) -Y 136 -Width 210 -Height 38
         Set-V2ControlBounds -Control $installSelectedButton -X ([Math]::Max(240, $pageW - 250)) -Y 136 -Width 220 -Height 38
         Set-V2ControlBounds -Control $availableCard -X 0 -Y 206 -Width $pageW -Height 120
+        Set-V2ControlBounds -Control $availableTitle -X 16 -Y 10 -Width 150 -Height 26
+        Set-V2ControlBounds -Control $viewUpdateListButton -X 176 -Y 9 -Width 112 -Height 28
+        $metricsStart = [Math]::Max(330, $pageW - 440)
+        $metricGap = [int][Math]::Floor(([Math]::Max(300, $pageW - $metricsStart - 20)) / 4)
+        $metricGap = [Math]::Max(72, $metricGap)
+        $summaryW = [Math]::Max(260, $metricsStart - 40)
+        Set-V2ControlBounds -Control $availableSummary -X 20 -Y 50 -Width $summaryW -Height 44
+        Set-V2ControlBounds -Control $importantCount -X $metricsStart -Y 42 -Width 60 -Height 34
+        Set-V2ControlBounds -Control $importantCaption -X ($metricsStart - 13) -Y 78 -Width 86 -Height 20
+        Set-V2ControlBounds -Control $optionalCount -X ($metricsStart + $metricGap) -Y 42 -Width 60 -Height 34
+        Set-V2ControlBounds -Control $optionalCaption -X ($metricsStart + $metricGap - 13) -Y 78 -Width 86 -Height 20
+        Set-V2ControlBounds -Control $driversCount -X ($metricsStart + ($metricGap * 2)) -Y 42 -Width 60 -Height 34
+        Set-V2ControlBounds -Control $driversCaption -X ($metricsStart + ($metricGap * 2) - 13) -Y 78 -Width 86 -Height 20
+        Set-V2ControlBounds -Control $firmwareSkippedCount -X ($metricsStart + ($metricGap * 3)) -Y 42 -Width 60 -Height 34
+        Set-V2ControlBounds -Control $firmwareSkippedCaption -X ($metricsStart + ($metricGap * 3) - 28) -Y 78 -Width 116 -Height 20
         Set-V2ControlBounds -Control $restartCard -X 0 -Y 342 -Width $pageW -Height 90
         Set-V2ControlBounds -Control $restartLabel -X 20 -Y 48 -Width ([Math]::Max(260, $pageW - 310)) -Height 24
         Set-V2ControlBounds -Control $restartNowButton -X ([Math]::Max(20, $pageW - 260)) -Y 42 -Width 112 -Height 32
         Set-V2ControlBounds -Control $restartDetailsButton -X ([Math]::Max(140, $pageW - 130)) -Y 42 -Width 100 -Height 32
-        Set-V2ControlBounds -Control $linksCard -X 0 -Y 448 -Width $pageW -Height 95
+        Set-V2ControlBounds -Control $linksCard -X 0 -Y 448 -Width $pageW -Height 108
+        $linkW = [Math]::Max(130, [int][Math]::Floor(($pageW - 40) / 4))
+        Set-V2ControlBounds -Control $imageLink -X 20 -Y 54 -Width $linkW -Height 24
+        Set-V2ControlBounds -Control $classesLink -X (20 + $linkW) -Y 54 -Width $linkW -Height 24
+        Set-V2ControlBounds -Control $remoteAssistLink -X (20 + ($linkW * 2)) -Y 54 -Width $linkW -Height 24
+        Set-V2ControlBounds -Control $officialSiteLink -X (20 + ($linkW * 3)) -Y 54 -Width ([Math]::Max(130, $pageW - 40 - ($linkW * 3))) -Height 24
 
         if ($pageW -lt 820) {
             $nextCard.Visible = $false
