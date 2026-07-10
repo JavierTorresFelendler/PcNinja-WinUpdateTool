@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.21.0'
+    $Version = '2.0.22.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC21'
+    $PublicLabel = 'V2.0.0-RC22'
 }
 
 if (-not $Repository) {
@@ -592,6 +592,12 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Fixes V2 available-update preview result handling so successful scans do not surface as generic Failed popups.',
     '- Filters warning/info stream noise from V2 preview JSON output so Check Available Updates can complete in MSI and portable builds.',
     '- Adds Clear Schedule in V2 Settings and removes all PcNinja WinUpdate Tool scheduled tasks during cleanup.',
+    '- Sets a larger V2 minimum window size based on VM layout validation.',
+    '- Moves Settings Save/Clear schedule actions into the upper schedule area.',
+    '- Fixes the Windows & Office Activation link label so the ampersand displays correctly.',
+    '- Moves the Logs filter field beside Open Log File.',
+    '- Replaces the small white-backed header icon with a cropped dark-background PcNinja logo.',
+    '- Rewrites restart-state details so users see a clear restart/no-restart message instead of raw registry diagnostics.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',
@@ -649,5 +655,3 @@ Set-Content -LiteralPath ($publicZipPath + '.sha256.txt') -Value ("{0}  {1}" -f 
 
 Get-FileHash -LiteralPath $msiPath, $portableExePath, $hostExePath, $cliExePath, $publicMsiPath, $publicPortablePath, $publicZipPath -Algorithm SHA256 |
     Select-Object Algorithm, Hash, Path
-
-

@@ -182,6 +182,8 @@ function Show-PcnWinUpdateV2Ui {
 
         $link = New-Object System.Windows.Forms.LinkLabel
         $link.Text = $Text
+        $link.UseMnemonic = $false
+        $link.AutoEllipsis = $true
         $link.Tag = $Url
         $link.AutoSize = $false
         $link.Font = $fontBase
@@ -783,11 +785,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $form.BackColor = $colors.AppBack
     $form.ForeColor = $colors.Text
     $form.Font = $fontBase
-    $form.Size = New-V2Size 1180 735
-    $form.MinimumSize = New-V2Size 1050 650
+    $form.Size = New-V2Size 1180 760
+    $form.MinimumSize = New-V2Size 1120 760
     Enable-V2DoubleBuffering -Control $form
 
     $iconPath = Join-Path $PSScriptRoot 'assets\PcNinja.ico'
+    $headerLogoPath = Join-Path $PSScriptRoot 'assets\Ninja-DMT-header.png'
     if (Test-Path -LiteralPath $iconPath) {
         try {
             $form.Icon = New-Object System.Drawing.Icon($iconPath)
@@ -806,10 +809,25 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $form.Controls.Add($header)
 
     $logo = New-Object System.Windows.Forms.PictureBox
-    $logo.Location = New-V2Point 14 8
-    $logo.Size = New-V2Size 28 28
+    $logo.Location = New-V2Point 10 3
+    $logo.Size = New-V2Size 38 38
     $logo.SizeMode = 'Zoom'
-    if (Test-Path -LiteralPath $iconPath) {
+    $logo.BackColor = $colors.HeaderBack
+    if (Test-Path -LiteralPath $headerLogoPath) {
+        try {
+            $sourceLogo = [System.Drawing.Image]::FromFile($headerLogoPath)
+            try {
+                $logo.Image = New-Object System.Drawing.Bitmap($sourceLogo)
+            }
+            finally {
+                $sourceLogo.Dispose()
+            }
+        }
+        catch {
+            $logo.BackColor = $colors.Blue
+        }
+    }
+    elseif (Test-Path -LiteralPath $iconPath) {
         try {
             $logo.Image = ([System.Drawing.Icon]::ExtractAssociatedIcon($iconPath)).ToBitmap()
         }
@@ -818,7 +836,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
     }
     $header.Controls.Add($logo)
-    $header.Controls.Add((New-V2Label -Text 'PcNinja WinUpdate Tool V2.0' -X 52 -Y 8 -Width 360 -Height 28 -Font $fontTitle))
+    $header.Controls.Add((New-V2Label -Text 'PcNinja WinUpdate Tool V2.0' -X 58 -Y 8 -Width 360 -Height 28 -Font $fontTitle))
 
     $settingsButton = New-V2Button -Text 'Settings' -X 945 -Y 8 -Width 94 -Height 28 -BorderColor $colors.Border
     $settingsButton.Anchor = 'Top,Right'
@@ -1143,9 +1161,9 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $schedule.Controls.Add($retryCard)
 
     $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 390 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
-    $clearScheduleButton.Anchor = 'Bottom,Right'
+    $clearScheduleButton.Anchor = 'Top,Right'
     $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 625 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
-    $saveScheduleButton.Anchor = 'Bottom,Right'
+    $saveScheduleButton.Anchor = 'Top,Right'
     $schedule.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton))
 
     $drivers = $pages['Drivers']
@@ -1170,7 +1188,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $toolsCard.Controls.Add((New-V2Label -Text 'Download links and shared file password.' -X 20 -Y 42 -Width 440 -Height 24 -ForeColor $colors.Muted))
     $pcnDriverLink = New-V2LinkLabel -Text 'Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 78 -Width 225
     $pcnOfficeLink = New-V2LinkLabel -Text 'Smart Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 110 -Width 225
-    $pcnActivationLink = New-V2LinkLabel -Text 'Windows & Office Activation' -Url 'https://active.pcninja.pro' -X 290 -Y 78 -Width 235
+    $pcnActivationLink = New-V2LinkLabel -Text 'Windows & Office Activation' -Url 'https://active.pcninja.pro' -X 290 -Y 78 -Width 270
     $pcnWindowsLink = New-V2LinkLabel -Text 'Custom PcNinja Images' -Url 'https://win11.pcninja.pro/' -X 290 -Y 110 -Width 225
     foreach ($pcnLink in @($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink)) {
         $pcnLink.Font = $fontTitle
@@ -1196,16 +1214,16 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $logsCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 510 -Title 'Application Logs'
     $logsCard.Anchor = 'Top,Bottom,Left,Right'
     $logsCard.Controls.Add((New-V2Label -Text 'View and analyze tool logs for troubleshooting.' -X 20 -Y 40 -Width 400 -Height 24 -ForeColor $colors.Muted))
-    $logFilterLabel = New-V2Label -Text 'Filter logs' -X 610 -Y 48 -Width 230 -Height 20 -Font $fontSmall -ForeColor $colors.Muted
-    $logFilterLabel.Anchor = 'Top,Right'
+    $logFilterLabel = New-V2Label -Text 'Filter logs' -X 515 -Y 48 -Width 220 -Height 20 -Font $fontSmall -ForeColor $colors.Muted
+    $logFilterLabel.Anchor = 'Top,Left'
     $logsCard.Controls.Add($logFilterLabel)
     $refreshLogsButton = New-V2Button -Text 'Refresh' -X 20 -Y 72 -Width 110 -Height 30
     $followLogsButton = New-V2Button -Text 'Following' -X 140 -Y 72 -Width 110 -Height 30
     $bottomLogsButton = New-V2Button -Text 'Bottom' -X 260 -Y 72 -Width 110 -Height 30
     $openLogFileButton = New-V2Button -Text 'Open Log File' -X 380 -Y 72 -Width 125 -Height 30 -BorderColor $colors.Border
-    $exportLogsButton = New-V2Button -Text 'Export Bundle' -X 515 -Y 72 -Width 105 -Height 30 -BorderColor $colors.Border
-    $filterBox = New-V2TextBox -X 610 -Y 72 -Width 230 -Height 28 -Text ''
-    $filterBox.Anchor = 'Top,Right'
+    $filterBox = New-V2TextBox -X 515 -Y 72 -Width 220 -Height 28 -Text ''
+    $filterBox.Anchor = 'Top,Left,Right'
+    $exportLogsButton = New-V2Button -Text 'Export Bundle' -X 745 -Y 72 -Width 105 -Height 30 -BorderColor $colors.Border
     $logFilterPlaceholder = 'Type to filter...'
     $filterBox.Text = $logFilterPlaceholder
     $filterBox.ForeColor = $colors.Muted
@@ -1504,20 +1522,25 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         if ($pageW -lt 820) {
             $nextCard.Visible = $false
-            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 186
+            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 226
             $scheduleComboX = [Math]::Min(300, [Math]::Max(170, $pageW - 190))
             Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
             Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
             Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
             Set-V2ControlBounds -Control $scheduleIntroLabel -X 20 -Y 158 -Width ([Math]::Max(260, $pageW - 40)) -Height 22
-            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 202 -Width $pageW -Height 96
+            $compactButtonW = [Math]::Min(170, [Math]::Max(140, [int](($pageW - 60) / 2)))
+            $compactSaveX = [Math]::Max(180, $pageW - $compactButtonW - 20)
+            $compactClearX = [Math]::Max(20, $compactSaveX - $compactButtonW - 14)
+            Set-V2ControlBounds -Control $clearScheduleButton -X $compactClearX -Y 184 -Width $compactButtonW -Height 32
+            Set-V2ControlBounds -Control $saveScheduleButton -X $compactSaveX -Y 184 -Width $compactButtonW -Height 32
+            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 242 -Width $pageW -Height 96
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 36 -Width 230 -Height 24
             $startupDelayX = [Math]::Min(520, [Math]::Max(300, $pageW - 260))
             Set-V2ControlBounds -Control $startupDelayLabel -X $startupDelayX -Y 36 -Width 96 -Height 24
             Set-V2ControlBounds -Control $startupDelayCombo -X ($startupDelayX + 104) -Y 32 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 68 -Width 300 -Height 24
             Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(430, [Math]::Max(330, $pageW - 300))) -Y 68 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 314 -Width $pageW -Height 152
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 354 -Width $pageW -Height 152
             Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(260, $pageW - 40)) -Height 24
             Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
@@ -1525,9 +1548,6 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
             Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 108 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 104 -Width ([Math]::Min(250, $pageW - 188)) -Height $retryFailureCombo.Height
-            $buttonY = [Math]::Max(482, [Math]::Min(($pageH - 48), 558))
-            Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 455)) -Y $buttonY -Width 210 -Height 38
-            Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(240, $pageW - 225)) -Y $buttonY -Width 210 -Height 38
         }
         else {
             $nextCard.Visible = $true
@@ -1553,10 +1573,14 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
             Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 104 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 100 -Width ([Math]::Min(260, $pageW - 188)) -Height $retryFailureCombo.Height
-            $buttonY = [Math]::Max(530, $pageH - 50)
-            Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 480)) -Y $buttonY -Width 220 -Height 40
-            Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(250, $pageW - 240)) -Y $buttonY -Width 220 -Height 40
+            $actionW = [Math]::Min(220, [Math]::Max(150, $pageW - $leftW - 80))
+            $actionX = [Math]::Max(($leftW + 40), ($pageW - $actionW - 40))
+            Set-V2ControlBounds -Control $clearScheduleButton -X $actionX -Y 158 -Width $actionW -Height 28
+            Set-V2ControlBounds -Control $saveScheduleButton -X $actionX -Y 188 -Width $actionW -Height 28
         }
+
+        $clearScheduleButton.BringToFront()
+        $saveScheduleButton.BringToFront()
 
         if ($pageW -lt 840) {
             Set-V2ControlBounds -Control $auditCard -X 0 -Y 0 -Width $pageW -Height 260
@@ -1571,7 +1595,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $toolsCard -X 0 -Y 276 -Width $pageW -Height 158
             Set-V2ControlBounds -Control $pcnDriverLink -X 20 -Y 78 -Width 225 -Height 24
             Set-V2ControlBounds -Control $pcnOfficeLink -X 20 -Y 110 -Width 225 -Height 24
-            Set-V2ControlBounds -Control $pcnActivationLink -X 270 -Y 78 -Width 205 -Height 24
+            Set-V2ControlBounds -Control $pcnActivationLink -X 270 -Y 78 -Width 260 -Height 24
             Set-V2ControlBounds -Control $pcnWindowsLink -X 270 -Y 110 -Width 205 -Height 24
             $passwordX = [Math]::Max(20, [Math]::Min(520, $pageW - 220))
             Set-V2ControlBounds -Control $passwordLabel -X $passwordX -Y 58 -Width 190 -Height 24
@@ -1591,7 +1615,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $toolsCard -X 0 -Y 184 -Width $pageW -Height 148
             Set-V2ControlBounds -Control $pcnDriverLink -X 20 -Y 78 -Width 225 -Height 24
             Set-V2ControlBounds -Control $pcnOfficeLink -X 20 -Y 110 -Width 225 -Height 24
-            Set-V2ControlBounds -Control $pcnActivationLink -X 290 -Y 78 -Width 205 -Height 24
+            Set-V2ControlBounds -Control $pcnActivationLink -X 290 -Y 78 -Width 270 -Height 24
             Set-V2ControlBounds -Control $pcnWindowsLink -X 290 -Y 110 -Width 205 -Height 24
             $passwordX = [Math]::Min([Math]::Max(620, [int]($pageW * 0.62)), $pageW - 250)
             Set-V2ControlBounds -Control $passwordLabel -X $passwordX -Y 58 -Width 190 -Height 24
@@ -1600,13 +1624,17 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
 
         Set-V2ControlBounds -Control $logsCard -X 0 -Y 0 -Width $pageW -Height ([Math]::Max(380, $pageH - 4))
-        $filterX = [Math]::Max(630, $pageW - 250)
-        $filterW = [Math]::Max(190, $pageW - $filterX - 20)
+        $filterX = 515
+        if ($pageW -lt 690) {
+            $filterX = 20
+        }
+        $reservedExportSpace = if ($pageW -ge 880) { 145 } else { 20 }
+        $filterW = [Math]::Min(260, [Math]::Max(180, $pageW - $filterX - $reservedExportSpace))
         Set-V2ControlBounds -Control $logFilterLabel -X $filterX -Y 48 -Width $filterW -Height 20
         Set-V2ControlBounds -Control $filterBox -X $filterX -Y 72 -Width $filterW -Height 28
-        $exportLogsButton.Visible = ($pageW -ge 850)
+        $exportLogsButton.Visible = ($pageW -ge ($filterX + $filterW + 135))
         if ($exportLogsButton.Visible) {
-            Set-V2ControlBounds -Control $exportLogsButton -X 515 -Y 72 -Width 105 -Height 30
+            Set-V2ControlBounds -Control $exportLogsButton -X ($filterX + $filterW + 10) -Y 72 -Width 115 -Height 30
         }
         Set-V2ControlBounds -Control $logBox -X 20 -Y 112 -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height ([Math]::Max(210, $logsCard.Height - 165))
         Set-V2ControlBounds -Control $logFooter -X 20 -Y ([Math]::Max(330, $logsCard.Height - 38)) -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height 24
@@ -1640,7 +1668,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
                 $rebootValue.Text = 'Not required'
                 $rebootValue.ForeColor = $colors.Green
                 if ($pendingReboot.PSObject.Properties['Warnings'] -and @($pendingReboot.Warnings).Count -gt 0) {
-                    $restartLabel.Text = 'Not required. Non-blocking rename warnings were detected.'
+                    $restartLabel.Text = 'Not required. Update checks can continue normally.'
                 }
                 else {
                     $restartLabel.Text = 'Not required'
@@ -1832,7 +1860,21 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
 
         $lines = New-Object System.Collections.Generic.List[string]
-        $lines.Add("Pending: $([bool]$PendingState.Pending)") | Out-Null
+        $isPending = [bool]$PendingState.Pending
+        if (-not $isPending) {
+            $lines.Add('Restart is not required.') | Out-Null
+            $lines.Add('PcNinja did not find a blocking Windows Update, servicing, or driver restart condition.') | Out-Null
+
+            if ($PendingState.PSObject.Properties['Warnings'] -and @($PendingState.Warnings).Count -gt 0) {
+                $lines.Add('') | Out-Null
+                $lines.Add('Note: Some generic Windows rename checks were unavailable or not present. This is common and does not block update checks.') | Out-Null
+            }
+
+            return ($lines -join "`r`n")
+        }
+
+        $lines.Add('Restart is required.') | Out-Null
+        $lines.Add('Windows reports a restart condition that can block update installation.') | Out-Null
 
         if (@($PendingState.Reasons).Count -gt 0) {
             $lines.Add('') | Out-Null
@@ -1844,9 +1886,14 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         if ($PendingState.PSObject.Properties['Warnings'] -and @($PendingState.Warnings).Count -gt 0) {
             $lines.Add('') | Out-Null
-            $lines.Add('Warnings:') | Out-Null
+            $lines.Add('Notes:') | Out-Null
             foreach ($warning in @($PendingState.Warnings)) {
-                $lines.Add("  - $warning") | Out-Null
+                if ([string]$warning -match 'PendingFileRenameOperations') {
+                    $lines.Add('  - Generic pending-file-rename registry details were unavailable. PcNinja is using the Windows Update and servicing restart signals instead.') | Out-Null
+                }
+                else {
+                    $lines.Add("  - $warning") | Out-Null
+                }
             }
         }
 

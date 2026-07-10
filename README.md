@@ -1,8 +1,17 @@
-# PcNinja WinUpdate Tool V2.0.0-RC21
+# PcNinja WinUpdate Tool V2.0.0-RC22
 
-RC21 focuses on final V2 UI polish: cleaner Schedule spacing, simpler free-tool labels, and more reliable top-tab resizing after window restore.
+RC22 focuses on public-release UI polish: safer minimum window sizing, cleaner Settings and Logs layouts, clearer restart details, and a dark-header PcNinja logo.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
+
+## New In RC22
+
+- Sets a larger V2 minimum window size based on VM layout validation.
+- Moves Settings Save/Clear schedule actions into the upper schedule area.
+- Fixes the `Windows & Office Activation` label so the ampersand displays correctly.
+- Moves the Logs filter field beside `Open Log File`.
+- Replaces the small white-backed header icon with a cropped dark-background PcNinja logo.
+- Rewrites restart-state details so users see a clear restart/no-restart message instead of raw registry diagnostics.
 
 ## New In RC21
 
