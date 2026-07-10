@@ -9,13 +9,13 @@ using System.Text;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.0.20.0")]
-[assembly: AssemblyFileVersion("2.0.20.0")]
-[assembly: AssemblyInformationalVersion("V2.0.0-RC20")]
+[assembly: AssemblyVersion("2.0.21.0")]
+[assembly: AssemblyFileVersion("2.0.21.0")]
+[assembly: AssemblyInformationalVersion("V2.0.0-RC21")]
 
 internal static class WinUpdateToolCli
 {
-    private const string Version = "V2.0.0-RC20";
+    private const string Version = "V2.0.0-RC21";
 
     private static int Main(string[] args)
     {

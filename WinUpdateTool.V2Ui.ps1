@@ -1088,7 +1088,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $schedule = $pages['Schedule']
     $scheduleCard = New-V2Card -X 0 -Y 0 -Width 560 -Height 220 -Title 'Schedule'
-    $scheduleCard.Controls.Add((New-V2Label -Text 'Choose when the tool should run Windows Update.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted))
+    $scheduleIntroLabel = New-V2Label -Text 'Choose when the tool should run Windows Update.' -X 20 -Y 178 -Width 360 -Height 22 -Font $fontSmall -ForeColor $colors.Muted
     $dailyRadio = New-Object System.Windows.Forms.RadioButton
     $weeklyRadio = New-Object System.Windows.Forms.RadioButton
     $monthlyRadio = New-Object System.Windows.Forms.RadioButton
@@ -1109,7 +1109,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $scheduleTimeCombo = New-V2ComboBox -X 230 -Y 60 -Width 145 -Items @('02:00', '03:00', '04:00', '09:00', '18:00') -Selected '03:00'
     $scheduleDayCombo = New-V2ComboBox -X 230 -Y 92 -Width 145 -Items @('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') -Selected 'Sunday'
     $scheduleMonthDayCombo = New-V2ComboBox -X 230 -Y 124 -Width 145 -Items @('1', '5', '10', '15', '20', '25', '28') -Selected '15'
-    $scheduleCard.Controls.AddRange([System.Windows.Forms.Control[]]@($scheduleTimeCombo, $scheduleDayCombo, $scheduleMonthDayCombo))
+    $scheduleCard.Controls.AddRange([System.Windows.Forms.Control[]]@($scheduleTimeCombo, $scheduleDayCombo, $scheduleMonthDayCombo, $scheduleIntroLabel))
     $schedule.Controls.Add($scheduleCard)
 
     $nextCard = New-V2Card -X 580 -Y 0 -Width 290 -Height 220 -Title 'Next Run Summary'
@@ -1166,12 +1166,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $auditCard.Controls.AddRange([System.Windows.Forms.Control[]]@($driverAuditButton, $openDriverReportButton, $auditStatus, $reportSummary, $viewFullReportButton))
     $drivers.Controls.Add($auditCard)
 
-    $toolsCard = New-V2Card -X 0 -Y 184 -Width 870 -Height 148 -Title 'PcNinja Tools'
-    $toolsCard.Controls.Add((New-V2Label -Text 'PcNinja download links and shared file password.' -X 20 -Y 42 -Width 440 -Height 24 -ForeColor $colors.Muted))
-    $pcnDriverLink = New-V2LinkLabel -Text 'PcNinja Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 78 -Width 225
-    $pcnOfficeLink = New-V2LinkLabel -Text 'PcNinja Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 110 -Width 225
-    $pcnActivationLink = New-V2LinkLabel -Text 'PcNinja Activation' -Url 'https://active.pcninja.pro' -X 290 -Y 78 -Width 205
-    $pcnWindowsLink = New-V2LinkLabel -Text 'PcNinja Windows Image' -Url 'https://win11.pcninja.pro/' -X 290 -Y 110 -Width 205
+    $toolsCard = New-V2Card -X 0 -Y 184 -Width 870 -Height 148 -Title 'PcNinja Free Tools'
+    $toolsCard.Controls.Add((New-V2Label -Text 'Download links and shared file password.' -X 20 -Y 42 -Width 440 -Height 24 -ForeColor $colors.Muted))
+    $pcnDriverLink = New-V2LinkLabel -Text 'Driver Updater' -Url 'https://driver.pcninja.pro' -X 20 -Y 78 -Width 225
+    $pcnOfficeLink = New-V2LinkLabel -Text 'Smart Office Installer' -Url 'https://office.pcninja.pro' -X 20 -Y 110 -Width 225
+    $pcnActivationLink = New-V2LinkLabel -Text 'Windows & Office Activation' -Url 'https://active.pcninja.pro' -X 290 -Y 78 -Width 235
+    $pcnWindowsLink = New-V2LinkLabel -Text 'Custom PcNinja Images' -Url 'https://win11.pcninja.pro/' -X 290 -Y 110 -Width 225
     foreach ($pcnLink in @($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink)) {
         $pcnLink.Font = $fontTitle
     }
@@ -1423,8 +1423,13 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $pageW = [Math]::Max(1, ($content.ClientSize.Width - 8))
         $pageH = [Math]::Max(1, ($content.ClientSize.Height - 8))
 
+        $tabHostW = [Math]::Max($tabHost.ClientSize.Width, $content.ClientSize.Width)
+        if ($form.WindowState -eq 'Minimized' -or $tabHostW -lt 400) {
+            return
+        }
+
         $tabCount = [Math]::Max(1, $tabButtons.Count)
-        $tabW = [int][Math]::Floor($tabHost.ClientSize.Width / $tabCount)
+        $tabW = [int][Math]::Floor($tabHostW / $tabCount)
         $tabW = [Math]::Max(1, $tabW)
         $tabX = 0
         $tabIndex = 0
@@ -1432,11 +1437,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         foreach ($tabName in $tabOrder) {
             if ($tabButtons.ContainsKey($tabName)) {
                 $tabIndex++
-                $thisTabW = if ($tabIndex -eq $tabCount) { [Math]::Max(1, $tabHost.ClientSize.Width - $tabX) } else { $tabW }
+                $thisTabW = if ($tabIndex -eq $tabCount) { [Math]::Max(1, $tabHostW - $tabX) } else { $tabW }
                 Set-V2ControlBounds -Control $tabButtons[$tabName] -X $tabX -Y 0 -Width $thisTabW -Height 42
                 $tabX += $thisTabW
             }
         }
+        $tabHost.Invalidate($true)
 
         $pages['Dashboard'].AutoScroll = $false
         Set-V2ControlBounds -Control $overviewCard -X 0 -Y 42 -Width $pageW -Height 124
@@ -1498,19 +1504,20 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         if ($pageW -lt 820) {
             $nextCard.Visible = $false
-            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 160
+            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 186
             $scheduleComboX = [Math]::Min(300, [Math]::Max(170, $pageW - 190))
             Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
             Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
             Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
-            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 176 -Width $pageW -Height 96
+            Set-V2ControlBounds -Control $scheduleIntroLabel -X 20 -Y 158 -Width ([Math]::Max(260, $pageW - 40)) -Height 22
+            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 202 -Width $pageW -Height 96
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 36 -Width 230 -Height 24
             $startupDelayX = [Math]::Min(520, [Math]::Max(300, $pageW - 260))
             Set-V2ControlBounds -Control $startupDelayLabel -X $startupDelayX -Y 36 -Width 96 -Height 24
             Set-V2ControlBounds -Control $startupDelayCombo -X ($startupDelayX + 104) -Y 32 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 68 -Width 300 -Height 24
             Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(430, [Math]::Max(330, $pageW - 300))) -Y 68 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 288 -Width $pageW -Height 152
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 314 -Width $pageW -Height 152
             Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(260, $pageW - 40)) -Height 24
             Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
@@ -1518,7 +1525,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
             Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 108 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 104 -Width ([Math]::Min(250, $pageW - 188)) -Height $retryFailureCombo.Height
-            $buttonY = [Math]::Max(456, [Math]::Min(($pageH - 48), 532))
+            $buttonY = [Math]::Max(482, [Math]::Min(($pageH - 48), 558))
             Set-V2ControlBounds -Control $clearScheduleButton -X ([Math]::Max(20, $pageW - 455)) -Y $buttonY -Width 210 -Height 38
             Set-V2ControlBounds -Control $saveScheduleButton -X ([Math]::Max(240, $pageW - 225)) -Y $buttonY -Width 210 -Height 38
         }
@@ -1530,6 +1537,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
             Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
             Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
+            Set-V2ControlBounds -Control $scheduleIntroLabel -X 20 -Y 178 -Width ([Math]::Max(260, $leftW - 40)) -Height 22
             Set-V2ControlBounds -Control $nextCard -X ($leftW + 20) -Y 0 -Width ($pageW - $leftW - 20) -Height 220
             Set-V2ControlBounds -Control $wakeCard -X 0 -Y 238 -Width $pageW -Height 118
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 42 -Width 230 -Height 24
@@ -2613,6 +2621,13 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     })
     $filterBox.Add_TextChanged({ Refresh-V2Logs })
     $content.Add_Resize({ Set-V2ResponsiveLayout })
+    $tabHost.Add_SizeChanged({ Set-V2ResponsiveLayout })
+    $form.Add_SizeChanged({
+        if ($form.WindowState -ne 'Minimized') {
+            Set-V2ResponsiveLayout
+        }
+    })
+    $form.Add_ResizeEnd({ Set-V2ResponsiveLayout })
 
     $form.Add_FormClosed({
         $smokeTimer.Stop()

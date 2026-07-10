@@ -32,11 +32,11 @@ if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
 }
 
 if (-not $Version) {
-    $Version = '2.0.20.0'
+    $Version = '2.0.21.0'
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC20'
+    $PublicLabel = 'V2.0.0-RC21'
 }
 
 if (-not $Repository) {
@@ -583,6 +583,9 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Adds host, CPU, RAM, and free-disk details to the V2 System Status sidebar.',
     '- Adds Remote Assistance and official PcNinja site links to the V2 Updates helpful-links panel.',
     '- Repositions the Available Updates View List action and fixes top-tab resizing at narrow widths.',
+    '- Moves the V2 Schedule helper text below the schedule fields to avoid visual interference with the time selector.',
+    '- Renames the Drivers tools panel to PcNinja Free Tools and simplifies the link labels.',
+    '- Reapplies tab layout after form and tab-host resize events so restored windows keep all top tabs visible.',
     '- Uses invariant English date formatting in the V2 UI even on non-English Windows locales.',
     '- Enables double buffering on the V2 form, panels, and cards to reduce resize/redraw artifacts.',
     '- Keeps long log lines on one line with horizontal scrolling so live-follow does not jump during wrapped lines.',

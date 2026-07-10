@@ -1,15 +1,15 @@
-# PcNinja WinUpdate Tool V2.0.0-RC20
+# PcNinja WinUpdate Tool V2.0.0-RC21
 
-RC20 focuses on public-ready V2 UI polish: richer machine status, cleaner Updates layout, helpful PcNinja links, and stable tab resizing.
+RC21 focuses on final V2 UI polish: cleaner Schedule spacing, simpler free-tool labels, and more reliable top-tab resizing after window restore.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
-## New In RC20
+## New In RC21
 
-- Adds host, CPU, RAM, and free-disk details to the V2 System Status sidebar.
-- Adds Remote Assistance and official PcNinja site links to the Updates helpful-links panel.
-- Moves `View List` into the Available Updates title row and rebalances the count layout.
-- Fixes top-tab resizing so Dashboard, Updates, Drivers, and Logs remain visible while resizing.
+- Moves the Schedule helper text below the schedule fields to avoid visual interference with the time selector.
+- Renames the Drivers tools panel to `PcNinja Free Tools`.
+- Simplifies the Drivers tool links to `Driver Updater`, `Smart Office Installer`, `Windows & Office Activation`, and `Custom PcNinja Images`.
+- Reapplies tab layout after form and tab-host resize events so restored windows keep all top tabs visible.
 - Keeps MSI/ProductVersion metadata aligned so Windows uninstall views match the RC build.
 - Uses invariant English date formatting in the V2 UI even on non-English Windows locales.
 - Enables double buffering on the V2 form, panels, and cards to reduce resize/redraw artifacts.
