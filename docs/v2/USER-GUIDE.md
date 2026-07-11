@@ -81,10 +81,10 @@ Installed CLI examples:
 Portable CLI examples:
 
 ```cmd
-PcNinja-WinUpdateTool-V2.0.0-RC24-Portable.exe /?
-PcNinja-WinUpdateTool-V2.0.0-RC24-Portable.exe -Mode Status -Json
-PcNinja-WinUpdateTool-V2.0.0-RC24-Portable.exe -Mode AppUpdateCheck -Json
-PcNinja-WinUpdateTool-V2.0.0-RC24-Portable.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json
+PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe /?
+PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode Status -Json
+PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode AppUpdateCheck -Json
+PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json
 ```
 
 ## Support Links

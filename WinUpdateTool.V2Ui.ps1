@@ -1130,6 +1130,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $clearScheduleButton.Visible = ($Name -eq 'Schedule')
         $saveScheduleButton.Visible = ($Name -eq 'Schedule')
         Set-V2HeaderLayout
+        # Recompute the responsive layout for the newly shown page. Without this,
+        # a page first opened at a small window size keeps stale bounds (clipped
+        # footer/scrollbars, mispositioned anchored controls) until a manual resize.
+        Set-V2ResponsiveLayout
 
         if ($Name -eq 'Logs') {
             Refresh-V2Logs -ScrollToEnd
@@ -1353,15 +1357,15 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $retryCard = New-V2Card -X 0 -Y 374 -Width 870 -Height 136 -Title 'Retry Policy'
     $retryCard.Anchor = 'Top,Left,Right'
-    $retryIntroLabel = New-V2Label -Text 'Configure how to handle failures and retries.' -X 20 -Y 40 -Width 360 -Height 24 -ForeColor $colors.Muted
-    $retryAttemptsLabel = New-V2Label -Text 'Retry failed updates' -X 20 -Y 74 -Width 145 -Height 24
-    $retryAttemptsCombo = New-V2ComboBox -X 168 -Y 70 -Width 145 -Items @('0 times', '1 time', '3 times', '5 times') -Selected '3 times'
-    $retryIntervalLabel = New-V2Label -Text 'Retry interval' -X 340 -Y 74 -Width 105 -Height 24
-    $retryIntervalCombo = New-V2ComboBox -X 448 -Y 70 -Width 145 -Items @('5 minutes', '15 minutes', '60 minutes') -Selected '5 minutes'
-    $retryFailureLabel = New-V2Label -Text 'On repeated failure' -X 20 -Y 104 -Width 145 -Height 24
-    $retryFailureCombo = New-V2ComboBox -X 168 -Y 100 -Width 210 -Items @('Snooz and retry later', 'Stop after retries') -Selected 'Snooz and retry later'
-    $retryFailureCombo.Anchor = 'Top,Right'
+    $retryIntroLabel = New-V2Label -Text 'Configure how to handle failures and retries.' -X 160 -Y 13 -Width 400 -Height 22 -ForeColor $colors.Muted
+    $retryAttemptsLabel = New-V2Label -Text 'Retry failed updates' -X 20 -Y 56 -Width 145 -Height 24
+    $retryAttemptsCombo = New-V2ComboBox -X 168 -Y 52 -Width 145 -Items @('0 times', '1 time', '3 times', '5 times') -Selected '3 times'
+    $retryIntervalLabel = New-V2Label -Text 'Retry interval' -X 340 -Y 56 -Width 105 -Height 24
+    $retryIntervalCombo = New-V2ComboBox -X 448 -Y 52 -Width 145 -Items @('5 minutes', '15 minutes', '60 minutes') -Selected '5 minutes'
+    $retryFailureLabel = New-V2Label -Text 'On repeated failure' -X 20 -Y 96 -Width 145 -Height 24
+    $retryFailureCombo = New-V2ComboBox -X 168 -Y 92 -Width 210 -Items @('Snooz and retry later', 'Stop after retries') -Selected 'Snooz and retry later'
     $retryCard.Controls.AddRange([System.Windows.Forms.Control[]]@($retryIntroLabel, $retryAttemptsLabel, $retryAttemptsCombo, $retryIntervalLabel, $retryIntervalCombo, $retryFailureLabel, $retryFailureCombo))
+    $retryIntroLabel.BringToFront()
     $schedule.Controls.Add($retryCard)
 
     $drivers = $pages['Drivers']
@@ -1420,13 +1424,13 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $bottomLogsButton = New-V2Button -Text 'Bottom' -X 260 -Y 72 -Width 110 -Height 30
     $openLogFileButton = New-V2Button -Text 'Open Log File' -X 380 -Y 72 -Width 125 -Height 30 -BorderColor $colors.Border
     $filterBox = New-V2TextBox -X 515 -Y 72 -Width 220 -Height 28 -Text ''
-    $filterBox.Anchor = 'Top,Left,Right'
-    $exportLogsButton = New-V2Button -Text 'Export Bundle' -X 745 -Y 72 -Width 105 -Height 30 -BorderColor $colors.Border
+    $exportLogsButton = New-V2Button -Text 'Export Bundle' -X 620 -Y 8 -Width 115 -Height 30 -BorderColor $colors.Border
     $logFilterPlaceholder = 'Type to filter...'
     $filterBox.Text = $logFilterPlaceholder
     $filterBox.ForeColor = $colors.Muted
     $uiState.LogFilterPlaceholderActive = $true
     $logsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($refreshLogsButton, $followLogsButton, $bottomLogsButton, $openLogFileButton, $exportLogsButton, $filterBox))
+    $exportLogsButton.BringToFront()
     $logBox = New-Object System.Windows.Forms.RichTextBox
     $logBox.ReadOnly = $true
     $logBox.BorderStyle = 'FixedSingle'
@@ -1737,14 +1741,15 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $startupDelayCombo -X ($startupDelayX + 104) -Y 32 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 68 -Width 300 -Height 24
             Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(430, [Math]::Max(330, $pageW - 300))) -Y 68 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 350 -Width $pageW -Height 150
-            Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(260, $pageW - 40)) -Height 24
-            Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
-            Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
-            Set-V2ControlBounds -Control $retryIntervalLabel -X 340 -Y 74 -Width 105 -Height 24
-            Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
-            Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 108 -Width 145 -Height 24
-            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 104 -Width ([Math]::Min(250, $pageW - 188)) -Height $retryFailureCombo.Height
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 350 -Width $pageW -Height 140
+            Set-V2ControlBounds -Control $retryIntroLabel -X 160 -Y 13 -Width ([Math]::Max(200, $pageW - 180)) -Height 22
+            $retryIntroLabel.BringToFront()
+            Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 56 -Width 145 -Height 24
+            Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 52 -Width 145 -Height $retryAttemptsCombo.Height
+            Set-V2ControlBounds -Control $retryIntervalLabel -X 340 -Y 56 -Width 105 -Height 24
+            Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 52 -Width 145 -Height $retryIntervalCombo.Height
+            Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 96 -Width 145 -Height 24
+            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 92 -Width ([Math]::Min(250, $pageW - 188)) -Height $retryFailureCombo.Height
         }
         else {
             $nextCard.Visible = $true
@@ -1762,14 +1767,15 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $startupDelayCombo -X 414 -Y 36 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 78 -Width 300 -Height 24
             Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(560, [Math]::Max(414, $pageW - 330))) -Y 78 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 362 -Width $pageW -Height 136
-            Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(360, $pageW - 40)) -Height 24
-            Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
-            Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
-            Set-V2ControlBounds -Control $retryIntervalLabel -X 340 -Y 74 -Width 105 -Height 24
-            Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
-            Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 104 -Width 145 -Height 24
-            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 100 -Width ([Math]::Min(260, $pageW - 188)) -Height $retryFailureCombo.Height
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 362 -Width $pageW -Height 140
+            Set-V2ControlBounds -Control $retryIntroLabel -X 160 -Y 13 -Width ([Math]::Max(360, $pageW - 180)) -Height 22
+            $retryIntroLabel.BringToFront()
+            Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 56 -Width 145 -Height 24
+            Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 52 -Width 145 -Height $retryAttemptsCombo.Height
+            Set-V2ControlBounds -Control $retryIntervalLabel -X 340 -Y 56 -Width 105 -Height 24
+            Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 52 -Width 145 -Height $retryIntervalCombo.Height
+            Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 96 -Width 145 -Height 24
+            Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 92 -Width ([Math]::Min(260, $pageW - 188)) -Height $retryFailureCombo.Height
         }
 
         if ($pageW -lt 840) {
@@ -1818,14 +1824,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         if ($pageW -lt 690) {
             $filterX = 20
         }
-        $reservedExportSpace = if ($pageW -ge 880) { 145 } else { 20 }
-        $filterW = [Math]::Min(260, [Math]::Max(180, $pageW - $filterX - $reservedExportSpace))
+        $filterW = [Math]::Min(260, [Math]::Max(180, $pageW - $filterX - 20))
         Set-V2ControlBounds -Control $logFilterLabel -X $filterX -Y 48 -Width $filterW -Height 20
         Set-V2ControlBounds -Control $filterBox -X $filterX -Y 72 -Width $filterW -Height 28
-        $exportLogsButton.Visible = ($pageW -ge ($filterX + $filterW + 135))
-        if ($exportLogsButton.Visible) {
-            Set-V2ControlBounds -Control $exportLogsButton -X ($filterX + $filterW + 10) -Y 72 -Width 115 -Height 30
-        }
+        # Export Bundle lives on the card title row, right-aligned above the filter field.
+        Set-V2ControlBounds -Control $exportLogsButton -X ([Math]::Max(20, ($filterX + $filterW - 115))) -Y 8 -Width 115 -Height 30
+        $exportLogsButton.BringToFront()
         Set-V2ControlBounds -Control $logBox -X 20 -Y 112 -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height ([Math]::Max(210, $logsCard.Height - 165))
         Set-V2ControlBounds -Control $logFooter -X 20 -Y ([Math]::Max(330, $logsCard.Height - 38)) -Width ([Math]::Max(500, $logsCard.Width - 40)) -Height 24
 

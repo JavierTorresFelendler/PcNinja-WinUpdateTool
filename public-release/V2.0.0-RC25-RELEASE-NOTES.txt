@@ -1,4 +1,4 @@
-﻿PcNinja WinUpdate Tool V2.0.0-RC24 Release Notes
+﻿PcNinja WinUpdate Tool V2.0.0-RC25 Release Notes
 
 Release candidate for V2.0.0.
 
@@ -52,6 +52,11 @@ Highlights:
 - Rewrites restart-state details so users see a clear restart/no-restart message instead of raw registry diagnostics.
 - Fixes the V2 window closing seconds after launch: the WAN IP lookup now uses file-redirected process output instead of thread-based output events that crashed the PowerShell host.
 - Adds a PCNINJA_V2_UI_SMOKE_MS override so UI smoke runs can stay open long enough to cover asynchronous startup work.
+- Moves the Logs Export Bundle action onto the Application Logs title row, always visible above the filter field.
+- Inlines the Retry Policy description with its card title and re-spaces the retry rows for a cleaner Settings layout.
+- Removes leftover anchor settings that fought the responsive layout, fixing the stretched filter box and the failure combo clipped at the right edge in small windows.
+- Recomputes the responsive layout whenever a tab is opened so pages no longer show clipped footers or missing scrollbars until a manual resize.
+- Reads the tool update manifest from the main branch now that development converges on a single stable branch.
 - Keeps Windows Update engine behavior based on V1.1.2.
 
 Notes:

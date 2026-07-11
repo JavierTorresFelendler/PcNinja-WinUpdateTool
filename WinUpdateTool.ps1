@@ -99,8 +99,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.0.0-RC24'
-        Version = '2.0.24.0'
+        PublicLabel = 'V2.0.0-RC25'
+        Version = '2.0.25.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool-V2'
     }
@@ -376,7 +376,7 @@ function Get-PcnDefaultAppUpdateManifestUrl {
         return $null
     }
 
-    return "https://api.github.com/repos/$repository/contents/public-release/update-manifest.json?ref=v2-dev"
+    return "https://api.github.com/repos/$repository/contents/public-release/update-manifest.json?ref=main"
 }
 
 function Get-PcnDefaultAppUpdateReleaseUrl {

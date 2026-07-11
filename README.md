@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.0.0-RC24
+﻿# PcNinja WinUpdate Tool V2.0.0-RC25
 
-RC24 is a stability release: it fixes the regression introduced in RC23 that closed the V2 window seconds after launch in both MSI and portable builds, and hardens the UI smoke-test tooling so asynchronous startup crashes are caught before release.
+RC25 focuses on small-window layout correctness: the Logs and Settings pages now lay out correctly at the initial window size, the Export Bundle action moved to the Application Logs title row, and the repository now converges on a single stable `main` branch.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -10,6 +10,14 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
 
 Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
+
+## New In RC25
+
+- Moves the Logs `Export Bundle` action onto the Application Logs title row, right-aligned above the filter field and always visible.
+- Inlines the Retry Policy description with its card title and re-spaces the retry rows with the freed vertical room.
+- Removes leftover WinForms anchor settings that fought the responsive layout engine — fixing the stretched log filter box and the `On repeated failure` combo being pushed off the right edge at small window sizes.
+- Recomputes the responsive layout every time a tab is opened, so pages opened at a small window size no longer show clipped footers, hidden buttons, or missing scrollbars until a manual resize.
+- Reads the tool update manifest from the `main` branch: development now converges on a single stable branch with no separate dev branch.
 
 ## New In RC24
 
