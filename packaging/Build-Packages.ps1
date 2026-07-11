@@ -556,6 +556,8 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     $(if ($PublicLabel -match '-RC') { 'Release candidate for the V2 line.' } else { 'Official stable release of the V2 line.' }),
     '',
     'Highlights:',
+    '- Adds a softer PcNinja alert sound for important warning, error, and question dialogs.',
+    '- Keeps routine informational dialogs silent and suppresses the harsh default Windows MessageBox sound.',
     '- Adds shared version manifest foundation.',
     '- Adds app update check/download/install CLI foundations.',
     '- Adds public update-manifest.json for GitHub Releases.',

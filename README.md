@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.2.3
+﻿# PcNinja WinUpdate Tool V2.2.4-RC1
 
-V2.2.3 restores the separation between MSI and portable app updates: portable installs download the new portable EXE beside the running file again, even when the launch goes through UAC elevation, while MSI installs keep the MSI flow.
+V2.2.4-RC1 adds the first calmer PcNinja alert-sound pass: routine dialogs are silent, while important warning/error/question dialogs use a softer PcNinja chime instead of the harsh Windows default alert.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -9,7 +9,14 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - V2 repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2
 - V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
 
-Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
+Use the V1 repository for the stable V1 download line. Use this repository for V2 stable releases and V2 release candidates.
+
+## New In V2.2.4-RC1
+
+- Adds `assets/PcNinja-SoftAlert.wav`, blended from Javier's preferred preview tones.
+- Routes V2 dialogs through quiet wrappers so routine informational dialogs are silent.
+- Plays the soft PcNinja alert only for important warning, error, and question dialogs.
+- Suppresses the default Windows MessageBox icon sound by showing app dialogs with no native MessageBox icon.
 
 ## New In V2.2.3
 

@@ -1,4 +1,4 @@
-function Show-PcnWinUpdateV2Ui {
+﻿function Show-PcnWinUpdateV2Ui {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
@@ -35,6 +35,59 @@ function Show-PcnWinUpdateV2Ui {
 
     function New-V2Size([int]$Width, [int]$Height) {
         return New-Object System.Drawing.Size($Width, $Height)
+    }
+
+    function Invoke-V2SoftAlertSound {
+        param([switch]$Important)
+
+        if (-not $Important) {
+            return
+        }
+
+        try {
+            $soundPath = Join-Path $PSScriptRoot 'assets\PcNinja-SoftAlert.wav'
+            if (Test-Path -LiteralPath $soundPath) {
+                $player = New-Object System.Media.SoundPlayer $soundPath
+                $player.Play()
+            }
+        }
+        catch {
+            $null = $_
+        }
+    }
+
+    function Show-V2MessageBox {
+        param(
+            [Parameter(ValueFromRemainingArguments = $true)]
+            [object[]]$Args
+        )
+
+        if ($Args.Count -eq 1 -and $Args[0] -is [array]) {
+            $Args = @($Args[0])
+        }
+
+        $text = if ($Args.Count -ge 1) { [string]$Args[0] } else { '' }
+        $caption = if ($Args.Count -ge 2) { [string]$Args[1] } else { 'PcNinja WinUpdate Tool' }
+        $buttons = if ($Args.Count -ge 3) { [string]$Args[2] } else { 'OK' }
+        $requestedIcon = if ($Args.Count -ge 4) { [string]$Args[3] } else { 'None' }
+
+        $importantIcons = @('Warning', 'Error', 'Question')
+        Invoke-V2SoftAlertSound -Important:($importantIcons -contains $requestedIcon)
+
+        $buttonValue = [System.Windows.Forms.MessageBoxButtons]::OK
+        try {
+            $buttonValue = [System.Windows.Forms.MessageBoxButtons]::$buttons
+        }
+        catch {
+            $buttonValue = [System.Windows.Forms.MessageBoxButtons]::OK
+        }
+
+        return [System.Windows.Forms.MessageBox]::Show(
+            $text,
+            $caption,
+            $buttonValue,
+            [System.Windows.Forms.MessageBoxIcon]::None
+        )
     }
 
     function Enable-V2DoubleBuffering {
@@ -817,7 +870,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $downloadButton.Add_Click({
             try {
                 if ($packageType -eq 'Portable') {
-                    $answer = [System.Windows.Forms.MessageBox]::Show(
+                    $answer = Show-V2MessageBox(
                         "This will download the verified portable EXE, close the current app, and start the new EXE from the same folder.`r`n`r`nContinue?",
                         'Run Portable Update',
                         'YesNo',
@@ -837,29 +890,29 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
                     $shaValue.Text = 'Verified'
                     $shaValue.ForeColor = $colors.Green
                     if ($packageType -eq 'Portable') {
-                        [System.Windows.Forms.MessageBox]::Show("Downloaded and verified:`r`n$($download.FilePath)`r`n`r`nThe current app will close and the new EXE will start.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                        Show-V2MessageBox("Downloaded and verified:`r`n$($download.FilePath)`r`n`r`nThe current app will close and the new EXE will start.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
                         Start-V2PostUpdateRelaunch -PackageType Portable -TargetPath ([string]$download.FilePath)
                         $dialog.Close()
                         $Owner.Close()
                     }
                     else {
-                        [System.Windows.Forms.MessageBox]::Show("Downloaded and verified:`r`n$($download.FilePath)", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                        Show-V2MessageBox("Downloaded and verified:`r`n$($download.FilePath)", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
                     }
                 }
                 elseif ($download.Result -eq 'NoNewerVersion') {
-                    [System.Windows.Forms.MessageBox]::Show("No newer $packageLabel is available from the manifest.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
+                    Show-V2MessageBox("No newer $packageLabel is available from the manifest.", 'PcNinja Tool Update', 'OK', 'Information') | Out-Null
                 }
                 else {
-                    [System.Windows.Forms.MessageBox]::Show("Download did not complete: $($download.Result)", 'PcNinja Tool Update', 'OK', 'Warning') | Out-Null
+                    Show-V2MessageBox("Download did not complete: $($download.Result)", 'PcNinja Tool Update', 'OK', 'Warning') | Out-Null
                 }
             }
             catch {
-                [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Download Tool Update', 'OK', 'Warning') | Out-Null
+                Show-V2MessageBox($_.Exception.Message, 'Download Tool Update', 'OK', 'Warning') | Out-Null
             }
         })
 
         $installButton.Add_Click({
-            $answer = [System.Windows.Forms.MessageBox]::Show(
+            $answer = Show-V2MessageBox(
                 "This will download the verified MSI, start Windows Installer, and close PcNinja WinUpdate Tool so files can be replaced.`r`n`r`nContinue?",
                 'Install Tool Update',
                 'YesNo',
@@ -874,16 +927,16 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
                 $install = Invoke-PcnAppUpdateInstall -CachePath (Get-V2DownloadsFolder)
                 if ($install.Success -and $install.Result -eq 'InstallerHandoffStarted') {
                     Start-V2PostUpdateRelaunch -PackageType Msi -InstallerProcessId ([int]$install.ProcessId)
-                    [System.Windows.Forms.MessageBox]::Show('Windows Installer was started. The app will close now and relaunch after installation finishes.', 'Install Tool Update', 'OK', 'Information') | Out-Null
+                    Show-V2MessageBox('Windows Installer was started. The app will close now and relaunch after installation finishes.', 'Install Tool Update', 'OK', 'Information') | Out-Null
                     $dialog.Close()
                     $Owner.Close()
                 }
                 else {
-                    [System.Windows.Forms.MessageBox]::Show("Installer handoff did not start: $($install.Result)", 'Install Tool Update', 'OK', 'Warning') | Out-Null
+                    Show-V2MessageBox("Installer handoff did not start: $($install.Result)", 'Install Tool Update', 'OK', 'Warning') | Out-Null
                 }
             }
             catch {
-                [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Install Tool Update', 'OK', 'Warning') | Out-Null
+                Show-V2MessageBox($_.Exception.Message, 'Install Tool Update', 'OK', 'Warning') | Out-Null
             }
         })
 
@@ -1564,7 +1617,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Start-Process -FilePath 'notepad.exe' -ArgumentList "`"$($paths.LogFile)`"" | Out-Null
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Open Log File', 'OK', 'Warning') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Open Log File', 'OK', 'Warning') | Out-Null
         }
     }
 
@@ -1574,12 +1627,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $form.Refresh()
             $result = New-PcnCliLogPackage -Tail 500
             Set-V2FooterStatus -Message "Log bundle created: $($result.ZipPath)" -SystemText 'Log bundle ready' -SystemColor $colors.Green
-            [System.Windows.Forms.MessageBox]::Show("Public support log bundle created:`r`n$($result.ZipPath)", 'Export Logs', 'OK', 'Information') | Out-Null
+            Show-V2MessageBox("Public support log bundle created:`r`n$($result.ZipPath)", 'Export Logs', 'OK', 'Information') | Out-Null
             Start-Process -FilePath explorer.exe -ArgumentList ('/select,"{0}"' -f $result.ZipPath) | Out-Null
         }
         catch {
             Set-V2FooterStatus -Message "Log bundle failed: $($_.Exception.Message)" -SystemText 'Log export failed' -SystemColor $colors.Orange
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Export Logs', 'OK', 'Warning') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Export Logs', 'OK', 'Warning') | Out-Null
         }
     }
 
@@ -2057,12 +2110,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Refresh-V2Status
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Schedule Error', 'OK', 'Error') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Schedule Error', 'OK', 'Error') | Out-Null
         }
     }
 
     function Clear-V2Schedule {
-        $answer = [System.Windows.Forms.MessageBox]::Show(
+        $answer = Show-V2MessageBox(
             "Clear the saved schedule and remove PcNinja WinUpdate Tool scheduled tasks?`r`n`r`nThe PcNinja Task Scheduler folder may remain, but this tool's schedule, retry, and run-once tasks will be removed.",
             'Clear Schedule',
             'YesNo',
@@ -2096,7 +2149,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             }
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Clear Schedule Error', 'OK', 'Error') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Clear Schedule Error', 'OK', 'Error') | Out-Null
         }
     }
 
@@ -2120,7 +2173,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
 
         if ($parts.Count -eq 0) {
-            [System.Windows.Forms.MessageBox]::Show('Select at least one update scope before checking or installing.', 'Update Scope', 'OK', 'Information') | Out-Null
+            Show-V2MessageBox('Select at least one update scope before checking or installing.', 'Update Scope', 'OK', 'Information') | Out-Null
             return $null
         }
 
@@ -2256,7 +2309,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             return $false
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Restart Required', 'OK', 'Warning') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Restart Required', 'OK', 'Warning') | Out-Null
             return $false
         }
     }
@@ -2335,7 +2388,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
 
         if ([bool]$firmwareUpdatesCheck.Checked) {
-            $answer = [System.Windows.Forms.MessageBox]::Show(
+            $answer = Show-V2MessageBox(
                 "Firmware/BIOS updates are enabled for this run.`r`n`r`nContinue only if the machine is on reliable power and you are comfortable letting Windows Update install firmware packages.",
                 'Firmware Updates Enabled',
                 'YesNo',
@@ -2377,7 +2430,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     }
 
     function Start-V2ResetWindowsUpdate {
-        $answer = [System.Windows.Forms.MessageBox]::Show(
+        $answer = Show-V2MessageBox(
             "Reset Windows Update will stop Windows Update services, delete and recreate C:\Windows\SoftwareDistribution, and restart services.`r`n`r`nContinue?",
             'Reset Windows Update',
             'YesNo',
@@ -2402,10 +2455,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $auditStatus.Text = "Last audit: $(Format-V2Now)"
             $reportSummary.Text = "Devices scanned: $($report.TotalDevices)`r`nDriver candidates: $($report.CandidateDevices)`r`nAudit candidates: $($report.AuditCandidateDevices)`r`nHigh priority: $($report.HighPriorityAuditCandidates)"
             $footerLabel.Text = 'Driver audit created.'
-            [System.Windows.Forms.MessageBox]::Show("Driver audit created.`r`n$($report.CsvPath)", 'Driver Audit', 'OK', 'Information') | Out-Null
+            Show-V2MessageBox("Driver audit created.`r`n$($report.CsvPath)", 'Driver Audit', 'OK', 'Information') | Out-Null
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Driver Audit Error', 'OK', 'Error') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Driver Audit Error', 'OK', 'Error') | Out-Null
         }
     }
 
@@ -2417,7 +2470,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     function Show-V2UpdateList {
         $items = @($uiState.LastPreviewItems)
         if ($items.Count -eq 0) {
-            [System.Windows.Forms.MessageBox]::Show('No update list is available yet. Run Check Available Updates first.', 'Available Updates', 'OK', 'Information') | Out-Null
+            Show-V2MessageBox('No update list is available yet. Run Check Available Updates first.', 'Available Updates', 'OK', 'Information') | Out-Null
             return
         }
 
@@ -2625,7 +2678,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $firmwareSkippedCount.Text = '!'
             $availableSummary.Text = 'Check failed. Open Logs for details.'
             Set-V2FooterStatus -Message "Preview scan failed: $($_.Exception.Message)" -SystemText 'Check failed' -SystemColor $colors.Orange
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
         }
         finally {
             Set-V2PreviewControlsEnabled -Enabled $true
@@ -2695,7 +2748,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $firmwareSkippedCount.Text = '!'
             $availableSummary.Text = 'Check failed to start.'
             Set-V2FooterStatus -Message "Update check failed to start: $($_.Exception.Message)" -SystemText 'Check failed' -SystemColor $colors.Orange
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Preview Updates', 'OK', 'Warning') | Out-Null
         }
     }
 
@@ -2905,10 +2958,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Restart-PcnComputerNow
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Restart Now', 'OK', 'Warning') | Out-Null
+            Show-V2MessageBox($_.Exception.Message, 'Restart Now', 'OK', 'Warning') | Out-Null
         }
     })
-    $restartDetailsButton.Add_Click({ [System.Windows.Forms.MessageBox]::Show((Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot), 'Restart State', 'OK', 'Information') | Out-Null })
+    $restartDetailsButton.Add_Click({ Show-V2MessageBox((Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot), 'Restart State', 'OK', 'Information') | Out-Null })
     $dashboardResetButton.Add_Click({ Start-V2ResetWindowsUpdate })
     $clearScheduleButton.Add_Click({ Clear-V2Schedule })
     $saveScheduleButton.Add_Click({ Save-V2Schedule })

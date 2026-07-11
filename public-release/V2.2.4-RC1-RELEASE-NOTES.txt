@@ -1,8 +1,10 @@
-﻿PcNinja WinUpdate Tool V2.2.3 Release Notes
+﻿PcNinja WinUpdate Tool V2.2.4-RC1 Release Notes
 
-Official stable release of the V2 line.
+Release candidate for the V2 line.
 
 Highlights:
+- Adds a softer PcNinja alert sound for important warning, error, and question dialogs.
+- Keeps routine informational dialogs silent and suppresses the harsh default Windows MessageBox sound.
 - Adds shared version manifest foundation.
 - Adds app update check/download/install CLI foundations.
 - Adds public update-manifest.json for GitHub Releases.

@@ -13,9 +13,9 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.2.3.1")]
-[assembly: AssemblyFileVersion("2.2.3.1")]
-[assembly: AssemblyInformationalVersion("V2.2.3")]
+[assembly: AssemblyVersion("2.2.4.1")]
+[assembly: AssemblyFileVersion("2.2.4.1")]
+[assembly: AssemblyInformationalVersion("V2.2.4-RC1")]
 
 internal static class WinUpdateToolHost
 {

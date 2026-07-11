@@ -11,13 +11,13 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.2.3.1")]
-[assembly: AssemblyFileVersion("2.2.3.1")]
-[assembly: AssemblyInformationalVersion("V2.2.3")]
+[assembly: AssemblyVersion("2.2.4.1")]
+[assembly: AssemblyFileVersion("2.2.4.1")]
+[assembly: AssemblyInformationalVersion("V2.2.4-RC1")]
 
 internal static class PortableLauncher
 {
-    private const string Version = "2.2.3.1";
+    private const string Version = "2.2.4.1";
     private const string PayloadResourceName = "PcNinjaPortablePayload";
 
     [STAThread]
@@ -244,7 +244,7 @@ internal static class PortableLauncher
         string executableName = Path.GetFileName(Application.ExecutablePath);
         if (String.IsNullOrWhiteSpace(executableName))
         {
-            executableName = "PcNinja-WinUpdateTool-V2.2.3-Portable.exe";
+            executableName = "PcNinja-WinUpdateTool-V2.2.4-RC1-Portable.exe";
         }
 
         StringBuilder builder = new StringBuilder();
