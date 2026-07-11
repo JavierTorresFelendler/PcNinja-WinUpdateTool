@@ -13,9 +13,9 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.2.2.1")]
-[assembly: AssemblyFileVersion("2.2.2.1")]
-[assembly: AssemblyInformationalVersion("V2.2.2.1")]
+[assembly: AssemblyVersion("2.2.3.0")]
+[assembly: AssemblyFileVersion("2.2.3.0")]
+[assembly: AssemblyInformationalVersion("V2.2.3-RC1")]
 
 internal static class WinUpdateToolHost
 {
@@ -123,13 +123,58 @@ internal static class WinUpdateToolHost
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 
+    private static string[] BuildElevatedArguments(string[] args)
+    {
+        // UAC elevation strips the custom environment variables set by the
+        // portable launcher (PCNINJA_PORTABLE_*), which made elevated portable
+        // runs misdetect themselves as MSI installs during app updates.
+        // Forward the portable context as command-line arguments instead.
+        List<string> list = new List<string>(args ?? new string[0]);
+
+        string portableSource = Environment.GetEnvironmentVariable("PCNINJA_PORTABLE_SOURCE_EXE");
+        if (String.IsNullOrEmpty(portableSource))
+        {
+            return list.ToArray();
+        }
+
+        bool hasPortableArg = false;
+        bool hasModeArg = false;
+        foreach (string arg in list)
+        {
+            string name = (arg ?? String.Empty).TrimStart('-', '/');
+            if (String.Equals(name, "PortableSourceExe", StringComparison.OrdinalIgnoreCase))
+            {
+                hasPortableArg = true;
+            }
+            else if (String.Equals(name, "Mode", StringComparison.OrdinalIgnoreCase))
+            {
+                hasModeArg = true;
+            }
+        }
+
+        if (!hasPortableArg)
+        {
+            if (!hasModeArg)
+            {
+                // Keep the relaunch recognized as a UI launch.
+                list.Add("-Mode");
+                list.Add("UI");
+            }
+
+            list.Add("-PortableSourceExe");
+            list.Add(portableSource);
+        }
+
+        return list.ToArray();
+    }
+
     private static int RelaunchElevated(string[] args)
     {
         string exePath = Assembly.GetExecutingAssembly().Location;
 
         ProcessStartInfo startInfo = new ProcessStartInfo();
         startInfo.FileName = exePath;
-        startInfo.Arguments = JoinArguments(args);
+        startInfo.Arguments = JoinArguments(BuildElevatedArguments(args));
         startInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
         startInfo.UseShellExecute = true;
         startInfo.Verb = "runas";

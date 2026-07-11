@@ -610,6 +610,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Removes leftover anchor settings that fought the responsive layout, fixing the stretched filter box and the failure combo clipped at the right edge in small windows.',
     '- Recomputes the responsive layout whenever a tab is opened so pages no longer show clipped footers or missing scrollbars until a manual resize.',
     '- Reads the tool update manifest from the main branch now that development converges on a single stable branch.',
+    '- Preserves portable-mode detection across UAC elevation by forwarding the portable source path as a command-line argument, so portable installs download the new portable EXE beside the running file instead of the MSI.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',

@@ -1,6 +1,6 @@
-﻿PcNinja WinUpdate Tool V2.2.2.1 Release Notes
+﻿PcNinja WinUpdate Tool V2.2.3-RC1 Release Notes
 
-Official stable release of the V2 line.
+Release candidate for the V2 line.
 
 Highlights:
 - Adds shared version manifest foundation.
@@ -57,6 +57,7 @@ Highlights:
 - Removes leftover anchor settings that fought the responsive layout, fixing the stretched filter box and the failure combo clipped at the right edge in small windows.
 - Recomputes the responsive layout whenever a tab is opened so pages no longer show clipped footers or missing scrollbars until a manual resize.
 - Reads the tool update manifest from the main branch now that development converges on a single stable branch.
+- Preserves portable-mode detection across UAC elevation by forwarding the portable source path as a command-line argument, so portable installs download the new portable EXE beside the running file instead of the MSI.
 - Keeps Windows Update engine behavior based on V1.1.2.
 
 Notes:

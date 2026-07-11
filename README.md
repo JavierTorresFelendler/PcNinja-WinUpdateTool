@@ -11,6 +11,10 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 
 Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
 
+## New In V2.2.3-RC1
+
+- Fixes portable installs being misdetected as MSI installs during app updates. UAC elevation strips the environment variables set by the portable launcher, so both the branded host and the script now forward the portable source path as a command-line argument across elevation. Portable installs once again download the new portable EXE beside the running file; MSI installs keep the MSI flow.
+
 ## New In V2.2.2.1 (Stable)
 
 - First official stable release of the V2 line; releases are published from the single `main` branch.

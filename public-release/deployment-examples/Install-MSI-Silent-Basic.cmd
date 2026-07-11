@@ -1,5 +1,5 @@
 @echo off
 setlocal
-set "MSI=%~dp0..\PcNinja-WinUpdateTool-V2.2.2.1-Setup-x64.msi"
+set "MSI=%~dp0..\PcNinja-WinUpdateTool-V2.2.3-RC1-Setup-x64.msi"
 msiexec /i "%MSI%" /qn /norestart
 exit /b %ERRORLEVEL%

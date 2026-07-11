@@ -82,10 +82,21 @@
 
     [string]$UpdateCachePath,
 
+    [string]$PortableSourceExe,
+
     [int]$LogTail = 50
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not [string]::IsNullOrWhiteSpace($PortableSourceExe)) {
+    # Portable context is passed as an argument across UAC elevation because
+    # elevated processes do not inherit the launcher's environment variables.
+    # Without this, an elevated relaunch loses PCNINJA_PORTABLE_MODE and the
+    # app update flow misdetects a portable install as an MSI install.
+    $env:PCNINJA_PORTABLE_MODE = '1'
+    $env:PCNINJA_PORTABLE_SOURCE_EXE = $PortableSourceExe
+}
 if ($Json) {
     $WarningPreference = 'SilentlyContinue'
     $InformationPreference = 'SilentlyContinue'
@@ -99,8 +110,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.2.2.1'
-        Version = '2.2.2.1'
+        PublicLabel = 'V2.2.3-RC1'
+        Version = '2.2.3.0'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool-V2'
     }
@@ -1488,6 +1499,12 @@ function Start-PcnElevatedSelf {
 
     $powershell = Get-PcnPowershellPath
     $arguments = '-STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode {1}' -f $PSCommandPath, $TargetMode
+    $portableSource = [string]$env:PCNINJA_PORTABLE_SOURCE_EXE
+    if (-not [string]::IsNullOrWhiteSpace($portableSource)) {
+        # Elevation strips custom environment variables; forward the portable
+        # context as an argument so package-type detection survives.
+        $arguments += ' -PortableSourceExe "{0}"' -f $portableSource
+    }
     Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden | Out-Null
 }
 
