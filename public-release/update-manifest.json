@@ -1,18 +1,18 @@
 {
     "channel":  "stable",
-    "publicLabel":  "V2.0.0-RC25",
-    "version":  "2.0.25.0",
-    "minimumSupportedVersion":  "2.0.25.0",
-    "releaseNotesUrl":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.0.0-rc25",
+    "publicLabel":  "V2.2.2.1",
+    "version":  "2.2.2.1",
+    "minimumSupportedVersion":  "2.2.2.1",
+    "releaseNotesUrl":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.2.2.1",
     "msi":  {
-                "fileName":  "PcNinja-WinUpdateTool-V2.0.0-RC25-Setup-x64.msi",
-                "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.0-rc25/PcNinja-WinUpdateTool-V2.0.0-RC25-Setup-x64.msi",
-                "sha256":  "0CC16B14293D1870CD71EFF4EB876D13C77A77115BF22DC6B6ADECF9ACE34EE8"
+                "fileName":  "PcNinja-WinUpdateTool-V2.2.2.1-Setup-x64.msi",
+                "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.2.1/PcNinja-WinUpdateTool-V2.2.2.1-Setup-x64.msi",
+                "sha256":  "0AE7F38B7B8DE13253788ADBA2F91422C377F352160CF39CD7853BC0D67DCEEE"
             },
     "portable":  {
-                     "fileName":  "PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe",
-                     "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.0-rc25/PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe",
-                     "sha256":  "A01FD78A8F573A7D5AE1EF5EA5A9411FA09E7380D62BE3C94C3AE4063CB8B9DD"
+                     "fileName":  "PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe",
+                     "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.2.1/PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe",
+                     "sha256":  "A5593A7848A00F3E00F17DC08D83C869BF87799CA5B9DC4F763F1C772C6BABD8"
                  },
     "signing":  {
                     "required":  false,

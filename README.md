@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.0.0-RC25
+﻿# PcNinja WinUpdate Tool V2.2.2.1
 
-RC25 focuses on small-window layout correctness: the Logs and Settings pages now lay out correctly at the initial window size, the Export Bundle action moved to the Application Logs title row, and the repository now converges on a single stable `main` branch.
+V2.2.2.1 is the first official stable release of the V2 line. It carries all the release-candidate work: the modern V2 UI, scheduled updates with wake and retry policies, driver audit, GitHub-based tool updates, and the RC24/RC25 stability and layout fixes.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -10,6 +10,11 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
 
 Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
+
+## New In V2.2.2.1 (Stable)
+
+- First official stable release of the V2 line; releases are published from the single `main` branch.
+- Keeps a `v2-dev` branch as a read-only compatibility alias of `main` so release-candidate installs (RC18-RC24) continue to receive update prompts at their built-in manifest URL. It is refreshed at each release and is not a development branch.
 
 ## New In RC25
 

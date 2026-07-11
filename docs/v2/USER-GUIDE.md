@@ -1,4 +1,4 @@
-# PcNinja WinUpdate Tool V2 User Guide
+﻿# PcNinja WinUpdate Tool V2 User Guide
 
 PcNinja WinUpdate Tool V2 is a Windows 10/11 utility for checking and installing Windows Update, Microsoft Update, optional update, and Windows Update driver catalog items from one focused interface.
 
@@ -81,10 +81,10 @@ Installed CLI examples:
 Portable CLI examples:
 
 ```cmd
-PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe /?
-PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode Status -Json
-PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode AppUpdateCheck -Json
-PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json
+PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe /?
+PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe -Mode Status -Json
+PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe -Mode AppUpdateCheck -Json
+PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json
 ```
 
 ## Support Links
@@ -92,3 +92,4 @@ PcNinja-WinUpdateTool-V2.0.0-RC25-Portable.exe -Mode AppUpdateDownload -UpdatePa
 - V2 repository: <https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2>
 - PcNinja website: <https://www.pcninja.pro>
 - Help portal: <https://help.pcninja.pro>
+

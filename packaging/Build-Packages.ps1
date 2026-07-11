@@ -553,7 +553,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTES.txt") -Encoding UTF8 -Value @(
     "PcNinja WinUpdate Tool $PublicLabel Release Notes",
     '',
-    'Release candidate for V2.0.0.',
+    $(if ($PublicLabel -match '-RC') { 'Release candidate for the V2 line.' } else { 'Official stable release of the V2 line.' }),
     '',
     'Highlights:',
     '- Adds shared version manifest foundation.',
@@ -613,7 +613,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',
-    '- This RC is unsigned unless signing was enabled during build.',
+    '- This release is unsigned unless signing was enabled during build.',
     '- Destructive Windows Update reset testing should be done in a VM.'
 )
 
