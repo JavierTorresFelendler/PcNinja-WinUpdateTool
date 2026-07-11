@@ -1,6 +1,6 @@
-# PcNinja WinUpdate Tool V2.0.0-RC22
+﻿# PcNinja WinUpdate Tool V2.0.0-RC23
 
-RC22 focuses on public-release UI polish: safer minimum window sizing, cleaner Settings and Logs layouts, clearer restart details, and a dark-header PcNinja logo.
+RC23 focuses on final public-release UI polish: stable Settings and Logs resizing, header-level schedule actions, richer System Status details, GitHub Help guidance, and the dark full Ninja-DMT V2 logo treatment.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -10,6 +10,15 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
 
 Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
+
+## New In RC23
+
+- Moves Settings `Clear Schedule` and `Save Schedule` actions to the top header beside Settings and Help.
+- Keeps Settings and Logs layouts stable after first paint, maximize, restore, and manual resizing.
+- Changes the Help button to open the GitHub V2 user guide.
+- Adds logged-on user, LAN/WAN IP, GPU, motherboard, and BIOS summary data to System Status.
+- Uses conditional log scrollbars so the log window does not show forced sliders when content does not require them.
+- Keeps the V2 logo on the dark full Ninja-DMT artwork across header, icon, MSI, and portable assets.
 
 ## New In RC22
 
@@ -793,6 +802,7 @@ The app displays:
 ```text
 wWw.PcNinja.Pro
 ```
+
 
 
 

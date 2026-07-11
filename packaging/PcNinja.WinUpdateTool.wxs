@@ -97,6 +97,7 @@
 
       <Component Id="AssetsComponent" Directory="AssetsFolder" Guid="{4ADCE33B-DB74-425D-8EFD-823AC5090691}">
         <File Id="NinjaLogoPng" Source="$(SourceDir)\assets\Ninja-DMT.png" KeyPath="yes" />
+        <File Id="NinjaHeaderLogoPng" Source="$(SourceDir)\assets\Ninja-DMT-header.png" />
         <File Id="PcNinjaIco" Source="$(SourceDir)\assets\PcNinja.ico" />
       </Component>
 

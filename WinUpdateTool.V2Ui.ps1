@@ -115,6 +115,7 @@ function Show-PcnWinUpdateV2Ui {
         $label.Location = New-V2Point $X $Y
         $label.Size = New-V2Size $Width $Height
         $label.TextAlign = $Align
+        $label.AutoEllipsis = $true
         return $label
     }
 
@@ -377,11 +378,143 @@ function Show-PcnWinUpdateV2Ui {
         }
     }
 
+    function Format-V2CompactText {
+        param(
+            [AllowNull()][object]$Value,
+            [int]$MaxLength = 34
+        )
+
+        $text = [string]$Value
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            return '-'
+        }
+
+        $text = ($text -replace '\s+', ' ').Trim()
+        if ($text.Length -le $MaxLength) {
+            return $text
+        }
+
+        if ($MaxLength -le 3) {
+            return $text.Substring(0, $MaxLength)
+        }
+
+        return ($text.Substring(0, ($MaxLength - 3)) + '...')
+    }
+
+    function Get-V2LoggedOnUser {
+        try {
+            $computer = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+            if ($computer.UserName) {
+                return (Format-V2CompactText -Value $computer.UserName -MaxLength 27)
+            }
+        }
+        catch {
+        }
+
+        if ($env:USERDOMAIN -and $env:USERNAME) {
+            return (Format-V2CompactText -Value "$env:USERDOMAIN\$env:USERNAME" -MaxLength 27)
+        }
+
+        if ($env:USERNAME) {
+            return (Format-V2CompactText -Value $env:USERNAME -MaxLength 27)
+        }
+
+        return 'Unknown'
+    }
+
+    function Get-V2InternalIpv4 {
+        try {
+            $address = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+                Where-Object {
+                    $_.IPAddress -and
+                    $_.IPAddress -ne '127.0.0.1' -and
+                    $_.IPAddress -notlike '169.254*'
+                } |
+                Sort-Object InterfaceMetric, InterfaceIndex |
+                Select-Object -First 1
+
+            if ($address -and $address.IPAddress) {
+                return [string]$address.IPAddress
+            }
+        }
+        catch {
+        }
+
+        try {
+            $fallback = [System.Net.Dns]::GetHostAddresses($env:COMPUTERNAME) |
+                Where-Object {
+                    $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
+                    $_.IPAddressToString -ne '127.0.0.1' -and
+                    $_.IPAddressToString -notlike '169.254*'
+                } |
+                Select-Object -First 1
+
+            if ($fallback) {
+                return [string]$fallback.IPAddressToString
+            }
+        }
+        catch {
+        }
+
+        return 'Not connected'
+    }
+
+    function Get-V2GpuSummary {
+        try {
+            $gpu = Get-CimInstance -ClassName Win32_VideoController -ErrorAction Stop |
+                Where-Object { $_.Name } |
+                Sort-Object AdapterRAM -Descending |
+                Select-Object -First 1
+
+            if ($gpu -and $gpu.Name) {
+                return ('GPU: {0}' -f (Format-V2CompactText -Value $gpu.Name -MaxLength 31))
+            }
+        }
+        catch {
+        }
+
+        return 'GPU: unavailable'
+    }
+
+    function Get-V2BoardSummary {
+        try {
+            $board = Get-CimInstance -ClassName Win32_BaseBoard -ErrorAction Stop | Select-Object -First 1
+            $parts = @($board.Manufacturer, $board.Product) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+            if ($parts.Count -gt 0) {
+                return ('Board: {0}' -f (Format-V2CompactText -Value ($parts -join ' ') -MaxLength 29))
+            }
+        }
+        catch {
+        }
+
+        return 'Board: unavailable'
+    }
+
+    function Get-V2BiosSummary {
+        try {
+            $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop | Select-Object -First 1
+            $version = if ($bios.SMBIOSBIOSVersion) { [string]$bios.SMBIOSBIOSVersion } elseif ($bios.BIOSVersion) { [string](@($bios.BIOSVersion)[0]) } else { '' }
+            if (-not [string]::IsNullOrWhiteSpace($version)) {
+                return ('BIOS: {0}' -f (Format-V2CompactText -Value $version -MaxLength 30))
+            }
+        }
+        catch {
+        }
+
+        return 'BIOS: unavailable'
+    }
+
     function Get-V2MachineSummary {
         $summary = [ordered]@{
             Host = $env:COMPUTERNAME
+            User = Get-V2LoggedOnUser
+            InternalIp = Get-V2InternalIpv4
+            ExternalIp = 'Checking...'
             Hardware = 'Hardware unavailable'
             Storage = 'Disk details unavailable'
+            Gpu = Get-V2GpuSummary
+            Board = Get-V2BoardSummary
+            Bios = Get-V2BiosSummary
         }
 
         try {
@@ -842,7 +975,13 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $settingsButton.Anchor = 'Top,Right'
     $helpButton = New-V2Button -Text 'Help' -X 1050 -Y 8 -Width 70 -Height 28 -BorderColor $colors.Border
     $helpButton.Anchor = 'Top,Right'
-    $header.Controls.AddRange([System.Windows.Forms.Control[]]@($settingsButton, $helpButton))
+    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 668 -Y 8 -Width 128 -Height 28 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
+    $clearScheduleButton.Anchor = 'Top,Right'
+    $clearScheduleButton.Visible = $false
+    $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 806 -Y 8 -Width 128 -Height 28 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+    $saveScheduleButton.Anchor = 'Top,Right'
+    $saveScheduleButton.Visible = $false
+    $header.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton, $settingsButton, $helpButton))
 
     $sidebar = New-V2Card -X 10 -Y 54 -Width 260 -Height 620 -Title 'System Status'
     $sidebar.Anchor = 'Top,Bottom,Left'
@@ -853,38 +992,59 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $sidebar.Controls.Add((New-V2Label -Text ([string][char]0xE782) -X 16 -Y 46 -Width 24 -Height 24 -Font (New-Object System.Drawing.Font('Segoe MDL2 Assets', 14)) -ForeColor $colors.Blue2))
     $sidebar.Controls.Add((New-V2Label -Text 'Windows' -X 46 -Y 44 -Width 175 -Height 24 -Font $fontTitle))
     $windowsLabel = New-V2Label -Text ("{0}`r`n{1} ({2})" -f $osInfo.Caption, $osInfo.Version, $osInfo.Build) -X 46 -Y 68 -Width 190 -Height 42 -Font $fontSmall -ForeColor $colors.Muted
-    $hostValue = New-V2Label -Text ([string]$machineInfo.Host) -X 86 -Y 118 -Width 152 -Height 20 -Font $fontSmall -ForeColor $colors.Text -Align 'MiddleRight'
-    $hardwareValue = New-V2Label -Text ([string]$machineInfo.Hardware) -X 18 -Y 144 -Width 220 -Height 20 -Font $fontSmall -ForeColor $colors.Muted
-    $storageValue = New-V2Label -Text ([string]$machineInfo.Storage) -X 18 -Y 168 -Width 220 -Height 38 -Font $fontSmall -ForeColor $colors.Muted
-    $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($windowsLabel, (New-V2Label -Text 'Host' -X 18 -Y 118 -Width 60 -Height 20 -Font $fontSmall -ForeColor $colors.Muted), $hostValue, $hardwareValue, $storageValue))
+    $hostValue = New-V2Label -Text ([string]$machineInfo.Host) -X 86 -Y 114 -Width 152 -Height 18 -Font $fontSmall -ForeColor $colors.Text -Align 'MiddleRight'
+    $userValue = New-V2Label -Text ([string]$machineInfo.User) -X 86 -Y 137 -Width 152 -Height 18 -Font $fontSmall -ForeColor $colors.Text -Align 'MiddleRight'
+    $internalIpValue = New-V2Label -Text ([string]$machineInfo.InternalIp) -X 86 -Y 160 -Width 152 -Height 18 -Font $fontSmall -ForeColor $colors.Text -Align 'MiddleRight'
+    $externalIpValue = New-V2Label -Text ([string]$machineInfo.ExternalIp) -X 86 -Y 183 -Width 152 -Height 18 -Font $fontSmall -ForeColor $colors.Muted -Align 'MiddleRight'
+    $hardwareValue = New-V2Label -Text ([string]$machineInfo.Hardware) -X 18 -Y 210 -Width 220 -Height 18 -Font $fontSmall -ForeColor $colors.Muted
+    $storageValue = New-V2Label -Text ([string]$machineInfo.Storage) -X 18 -Y 234 -Width 220 -Height 18 -Font $fontSmall -ForeColor $colors.Muted
+    $gpuValue = New-V2Label -Text ([string]$machineInfo.Gpu) -X 18 -Y 258 -Width 220 -Height 18 -Font $fontSmall -ForeColor $colors.Muted
+    $boardValue = New-V2Label -Text ([string]$machineInfo.Board) -X 18 -Y 282 -Width 220 -Height 18 -Font $fontSmall -ForeColor $colors.Muted
+    $biosValue = New-V2Label -Text ([string]$machineInfo.Bios) -X 18 -Y 306 -Width 220 -Height 18 -Font $fontSmall -ForeColor $colors.Muted
+    $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@(
+        $windowsLabel,
+        (New-V2Label -Text 'Host' -X 18 -Y 114 -Width 60 -Height 18 -Font $fontSmall -ForeColor $colors.Muted),
+        $hostValue,
+        (New-V2Label -Text 'User' -X 18 -Y 137 -Width 60 -Height 18 -Font $fontSmall -ForeColor $colors.Muted),
+        $userValue,
+        (New-V2Label -Text 'LAN' -X 18 -Y 160 -Width 60 -Height 18 -Font $fontSmall -ForeColor $colors.Muted),
+        $internalIpValue,
+        (New-V2Label -Text 'WAN' -X 18 -Y 183 -Width 60 -Height 18 -Font $fontSmall -ForeColor $colors.Muted),
+        $externalIpValue,
+        $hardwareValue,
+        $storageValue,
+        $gpuValue,
+        $boardValue,
+        $biosValue
+    ))
 
-    $healthValue = New-V2Label -Text 'OK' -X 180 -Y 226 -Width 58 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
-    $lastScanValue = New-V2Label -Text 'Loading...' -X 130 -Y 255 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
-    $lastInstallValue = New-V2Label -Text 'Loading...' -X 130 -Y 284 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
-    $rebootValue = New-V2Label -Text 'Checking' -X 130 -Y 313 -Width 108 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
+    $healthValue = New-V2Label -Text 'OK' -X 180 -Y 342 -Width 58 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
+    $lastScanValue = New-V2Label -Text 'Loading...' -X 130 -Y 367 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
+    $lastInstallValue = New-V2Label -Text 'Loading...' -X 130 -Y 392 -Width 108 -Height 22 -ForeColor $colors.Text -Align 'MiddleRight'
+    $rebootValue = New-V2Label -Text 'Checking' -X 130 -Y 417 -Width 108 -Height 22 -ForeColor $colors.Green -Align 'MiddleRight'
 
-    $sidebar.Controls.Add((New-V2Label -Text 'Health' -X 18 -Y 226 -Width 110 -Height 22 -ForeColor $colors.Text))
-    $sidebar.Controls.Add((New-V2Label -Text 'Last Scan' -X 18 -Y 255 -Width 110 -Height 22 -ForeColor $colors.Text))
-    $sidebar.Controls.Add((New-V2Label -Text 'Last Install' -X 18 -Y 284 -Width 110 -Height 22 -ForeColor $colors.Text))
-    $sidebar.Controls.Add((New-V2Label -Text 'Reboot' -X 18 -Y 313 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Health' -X 18 -Y 342 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Last Scan' -X 18 -Y 367 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Last Install' -X 18 -Y 392 -Width 110 -Height 22 -ForeColor $colors.Text))
+    $sidebar.Controls.Add((New-V2Label -Text 'Reboot' -X 18 -Y 417 -Width 110 -Height 22 -ForeColor $colors.Text))
     $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($healthValue, $lastScanValue, $lastInstallValue, $rebootValue))
 
     $divider1 = New-Object System.Windows.Forms.Panel
     $divider1.BackColor = $colors.Border
-    $divider1.Location = New-V2Point 16 352
+    $divider1.Location = New-V2Point 16 452
     $divider1.Size = New-V2Size 228 1
     $sidebar.Controls.Add($divider1)
 
-    $sidebar.Controls.Add((New-V2Label -Text 'PcNinja Tool' -X 18 -Y 370 -Width 160 -Height 24 -Font $fontTitle))
-    $installedValue = New-V2Label -Text $script:PcnToolPublicLabel -X 130 -Y 404 -Width 108 -Height 22 -Align 'MiddleRight'
-    $latestValueSide = New-V2Label -Text 'Check needed' -X 130 -Y 433 -Width 108 -Height 22 -Align 'MiddleRight'
-    $toolStatusValue = New-V2Label -Text 'Unknown' -X 130 -Y 462 -Width 108 -Height 22 -ForeColor $colors.Orange -Align 'MiddleRight'
-    $sidebar.Controls.Add((New-V2Label -Text 'Installed' -X 18 -Y 404 -Width 90 -Height 22))
-    $sidebar.Controls.Add((New-V2Label -Text 'Latest' -X 18 -Y 433 -Width 90 -Height 22))
-    $sidebar.Controls.Add((New-V2Label -Text 'Status' -X 18 -Y 462 -Width 90 -Height 22))
+    $sidebar.Controls.Add((New-V2Label -Text 'PcNinja Tool' -X 18 -Y 466 -Width 160 -Height 24 -Font $fontTitle))
+    $installedValue = New-V2Label -Text $script:PcnToolPublicLabel -X 130 -Y 498 -Width 108 -Height 22 -Align 'MiddleRight'
+    $latestValueSide = New-V2Label -Text 'Check needed' -X 130 -Y 523 -Width 108 -Height 22 -Align 'MiddleRight'
+    $toolStatusValue = New-V2Label -Text 'Unknown' -X 130 -Y 548 -Width 108 -Height 22 -ForeColor $colors.Orange -Align 'MiddleRight'
+    $sidebar.Controls.Add((New-V2Label -Text 'Installed' -X 18 -Y 498 -Width 90 -Height 22))
+    $sidebar.Controls.Add((New-V2Label -Text 'Latest' -X 18 -Y 523 -Width 90 -Height 22))
+    $sidebar.Controls.Add((New-V2Label -Text 'Status' -X 18 -Y 548 -Width 90 -Height 22))
     $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($installedValue, $latestValueSide, $toolStatusValue))
 
-    $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 502 -Width 228 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
+    $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 582 -Width 228 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
     $sidebar.Controls.Add($sidebarUpdateButton)
 
     $tabHost = New-Object System.Windows.Forms.Panel
@@ -908,7 +1068,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $page = New-Object System.Windows.Forms.Panel
         $page.BackColor = $colors.AppBack
         $page.Dock = 'Fill'
-        $page.AutoScroll = $true
+        $page.AutoScroll = $false
         $page.Visible = $false
         Enable-V2DoubleBuffering -Control $page
         $content.Controls.Add($page)
@@ -916,6 +1076,31 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     }
 
     $tabButtons = @{}
+    function Set-V2HeaderLayout {
+        $gap = 10
+        $right = [Math]::Max(760, ($header.ClientSize.Width - 18))
+        $helpW = 70
+        $settingsW = 94
+        $actionW = 128
+        $helpX = $right - $helpW
+        $settingsX = $helpX - $gap - $settingsW
+
+        Set-V2ControlBounds -Control $helpButton -X $helpX -Y 8 -Width $helpW -Height 28
+        Set-V2ControlBounds -Control $settingsButton -X $settingsX -Y 8 -Width $settingsW -Height 28
+
+        if ($clearScheduleButton.Visible -or $saveScheduleButton.Visible) {
+            $saveX = $settingsX - $gap - $actionW
+            $clearX = $saveX - 8 - $actionW
+            Set-V2ControlBounds -Control $clearScheduleButton -X $clearX -Y 8 -Width $actionW -Height 28
+            Set-V2ControlBounds -Control $saveScheduleButton -X $saveX -Y 8 -Width $actionW -Height 28
+            $clearScheduleButton.BringToFront()
+            $saveScheduleButton.BringToFront()
+        }
+
+        $settingsButton.BringToFront()
+        $helpButton.BringToFront()
+    }
+
     function Show-V2Page {
         param([Parameter(Mandatory = $true)][string]$Name)
 
@@ -941,6 +1126,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $settingsButton.BackColor = $colors.HeaderBack
             $settingsButton.FlatAppearance.BorderColor = $colors.Border
         }
+
+        $clearScheduleButton.Visible = ($Name -eq 'Schedule')
+        $saveScheduleButton.Visible = ($Name -eq 'Schedule')
+        Set-V2HeaderLayout
 
         if ($Name -eq 'Logs') {
             Refresh-V2Logs -ScrollToEnd
@@ -995,6 +1184,9 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         ToolUpdateAutoDialogShown = $false
         OperationProcess = $null
         OperationKind = $null
+        ExternalIpProcess = $null
+        ExternalIpOutPath = $null
+        ExternalIpErrPath = $null
     }
 
     $smokeTimer = New-Object System.Windows.Forms.Timer
@@ -1028,6 +1220,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $operationTimer.Interval = 1500
     $operationTimer.Add_Tick({
         Complete-V2OperationIfReady
+    })
+
+    $externalIpTimer = New-Object System.Windows.Forms.Timer
+    $externalIpTimer.Interval = 1000
+    $externalIpTimer.Add_Tick({
+        Complete-V2ExternalIpLookupIfReady
     })
 
     $dashboard = $pages['Dashboard']
@@ -1160,12 +1358,6 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $retryCard.Controls.AddRange([System.Windows.Forms.Control[]]@($retryIntroLabel, $retryAttemptsLabel, $retryAttemptsCombo, $retryIntervalLabel, $retryIntervalCombo, $retryFailureLabel, $retryFailureCombo))
     $schedule.Controls.Add($retryCard)
 
-    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 390 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
-    $clearScheduleButton.Anchor = 'Top,Right'
-    $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 625 -Y 506 -Width 220 -Height 40 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
-    $saveScheduleButton.Anchor = 'Top,Right'
-    $schedule.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton))
-
     $drivers = $pages['Drivers']
     $auditCard = New-V2Card -X 0 -Y 0 -Width 870 -Height 168 -Title ''
     $auditCard.Controls.Add((New-V2Label -Text 'Driver Audit' -X 20 -Y 12 -Width 260 -Height 26 -Font $fontTitle))
@@ -1239,7 +1431,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $logBox.Size = New-V2Size 820 345
     $logBox.Anchor = 'Top,Bottom,Left,Right'
     $logBox.WordWrap = $false
-    $logBox.ScrollBars = 'ForcedBoth'
+    $logBox.ScrollBars = 'Both'
     $logBox.HideSelection = $false
     $logsCard.Controls.Add($logBox)
     $logFooter = New-V2Label -Text 'Log file: WinUpdateTool.log' -X 20 -Y 466 -Width 600 -Height 24 -Font $fontSmall -ForeColor $colors.Muted
@@ -1440,6 +1632,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     function Set-V2ResponsiveLayout {
         $pageW = [Math]::Max(1, ($content.ClientSize.Width - 8))
         $pageH = [Math]::Max(1, ($content.ClientSize.Height - 8))
+        Set-V2HeaderLayout
 
         $tabHostW = [Math]::Max($tabHost.ClientSize.Width, $content.ClientSize.Width)
         if ($form.WindowState -eq 'Minimized' -or $tabHostW -lt 400) {
@@ -1462,7 +1655,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
         $tabHost.Invalidate($true)
 
-        $pages['Dashboard'].AutoScroll = $false
+        foreach ($page in $pages.Values) {
+            $page.AutoScroll = $false
+        }
+
         Set-V2ControlBounds -Control $overviewCard -X 0 -Y 42 -Width $pageW -Height 124
         Set-V2ControlBounds -Control $overviewStatus -X 108 -Y 52 -Width ([Math]::Max(260, $overviewCard.Width - 132)) -Height 30
         Set-V2ControlBounds -Control $overviewSub -X 108 -Y 86 -Width ([Math]::Max(260, $overviewCard.Width - 132)) -Height 28
@@ -1522,25 +1718,20 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         if ($pageW -lt 820) {
             $nextCard.Visible = $false
-            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 226
+            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $pageW -Height 198
             $scheduleComboX = [Math]::Min(300, [Math]::Max(170, $pageW - 190))
             Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
             Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
             Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
             Set-V2ControlBounds -Control $scheduleIntroLabel -X 20 -Y 158 -Width ([Math]::Max(260, $pageW - 40)) -Height 22
-            $compactButtonW = [Math]::Min(170, [Math]::Max(140, [int](($pageW - 60) / 2)))
-            $compactSaveX = [Math]::Max(180, $pageW - $compactButtonW - 20)
-            $compactClearX = [Math]::Max(20, $compactSaveX - $compactButtonW - 14)
-            Set-V2ControlBounds -Control $clearScheduleButton -X $compactClearX -Y 184 -Width $compactButtonW -Height 32
-            Set-V2ControlBounds -Control $saveScheduleButton -X $compactSaveX -Y 184 -Width $compactButtonW -Height 32
-            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 242 -Width $pageW -Height 96
+            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 214 -Width $pageW -Height 118
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 36 -Width 230 -Height 24
             $startupDelayX = [Math]::Min(520, [Math]::Max(300, $pageW - 260))
             Set-V2ControlBounds -Control $startupDelayLabel -X $startupDelayX -Y 36 -Width 96 -Height 24
             Set-V2ControlBounds -Control $startupDelayCombo -X ($startupDelayX + 104) -Y 32 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 68 -Width 300 -Height 24
             Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(430, [Math]::Max(330, $pageW - 300))) -Y 68 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 354 -Width $pageW -Height 152
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 350 -Width $pageW -Height 150
             Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(260, $pageW - 40)) -Height 24
             Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
@@ -1552,20 +1743,20 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         else {
             $nextCard.Visible = $true
             $leftW = [Math]::Min(640, [Math]::Max(520, [int][Math]::Floor($pageW * 0.64)))
-            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $leftW -Height 220
+            Set-V2ControlBounds -Control $scheduleCard -X 0 -Y 0 -Width $leftW -Height 210
             $scheduleComboX = [Math]::Min(300, [Math]::Max(230, $leftW - 190))
             Set-V2ControlBounds -Control $scheduleTimeCombo -X $scheduleComboX -Y 60 -Width 145 -Height $scheduleTimeCombo.Height
             Set-V2ControlBounds -Control $scheduleDayCombo -X $scheduleComboX -Y 92 -Width 145 -Height $scheduleDayCombo.Height
             Set-V2ControlBounds -Control $scheduleMonthDayCombo -X $scheduleComboX -Y 124 -Width 145 -Height $scheduleMonthDayCombo.Height
             Set-V2ControlBounds -Control $scheduleIntroLabel -X 20 -Y 178 -Width ([Math]::Max(260, $leftW - 40)) -Height 22
-            Set-V2ControlBounds -Control $nextCard -X ($leftW + 20) -Y 0 -Width ($pageW - $leftW - 20) -Height 220
-            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 238 -Width $pageW -Height 118
+            Set-V2ControlBounds -Control $nextCard -X ($leftW + 20) -Y 0 -Width ($pageW - $leftW - 20) -Height 210
+            Set-V2ControlBounds -Control $wakeCard -X 0 -Y 226 -Width $pageW -Height 118
             Set-V2ControlBounds -Control $startupCheck -X 20 -Y 42 -Width 230 -Height 24
             Set-V2ControlBounds -Control $startupDelayLabel -X 310 -Y 40 -Width 98 -Height 24
             Set-V2ControlBounds -Control $startupDelayCombo -X 414 -Y 36 -Width 72 -Height $startupDelayCombo.Height
             Set-V2ControlBounds -Control $wakeCheck -X 20 -Y 78 -Width 300 -Height 24
             Set-V2ControlBounds -Control $missedCheck -X ([Math]::Min(560, [Math]::Max(414, $pageW - 330))) -Y 78 -Width 260 -Height 24
-            Set-V2ControlBounds -Control $retryCard -X 0 -Y 374 -Width $pageW -Height 136
+            Set-V2ControlBounds -Control $retryCard -X 0 -Y 362 -Width $pageW -Height 136
             Set-V2ControlBounds -Control $retryIntroLabel -X 20 -Y 40 -Width ([Math]::Max(360, $pageW - 40)) -Height 24
             Set-V2ControlBounds -Control $retryAttemptsLabel -X 20 -Y 74 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryAttemptsCombo -X 168 -Y 70 -Width 145 -Height $retryAttemptsCombo.Height
@@ -1573,14 +1764,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $retryIntervalCombo -X 448 -Y 70 -Width 145 -Height $retryIntervalCombo.Height
             Set-V2ControlBounds -Control $retryFailureLabel -X 20 -Y 104 -Width 145 -Height 24
             Set-V2ControlBounds -Control $retryFailureCombo -X 168 -Y 100 -Width ([Math]::Min(260, $pageW - 188)) -Height $retryFailureCombo.Height
-            $actionW = [Math]::Min(220, [Math]::Max(150, $pageW - $leftW - 80))
-            $actionX = [Math]::Max(($leftW + 40), ($pageW - $actionW - 40))
-            Set-V2ControlBounds -Control $clearScheduleButton -X $actionX -Y 158 -Width $actionW -Height 28
-            Set-V2ControlBounds -Control $saveScheduleButton -X $actionX -Y 188 -Width $actionW -Height 28
         }
-
-        $clearScheduleButton.BringToFront()
-        $saveScheduleButton.BringToFront()
 
         if ($pageW -lt 840) {
             Set-V2ControlBounds -Control $auditCard -X 0 -Y 0 -Width $pageW -Height 260
@@ -1713,6 +1897,98 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $healthValue.Text = 'Check'
             $healthValue.ForeColor = $colors.Orange
             $footerLabel.Text = "Status warning: $($_.Exception.Message)"
+        }
+    }
+
+    function Start-V2ExternalIpLookup {
+        if ($uiState.ExternalIpProcess -and -not $uiState.ExternalIpProcess.HasExited) {
+            return
+        }
+
+        try {
+            $externalIpValue.Text = 'Checking...'
+            $externalIpValue.ForeColor = $colors.Muted
+            $uiState.ExternalIpOutPath = Join-Path $env:TEMP ('pcninja-v2-wan-{0}.out' -f ([guid]::NewGuid().ToString('N')))
+            $uiState.ExternalIpErrPath = Join-Path $env:TEMP ('pcninja-v2-wan-{0}.err' -f ([guid]::NewGuid().ToString('N')))
+            $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            $command = "try { `$ip = Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 4; if (`$ip) { [string]`$ip } else { 'Not connected' } } catch { 'Not connected' }"
+            $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+            $startInfo.FileName = $ps
+            $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"$command`""
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $true
+            $startInfo.RedirectStandardOutput = $true
+            $startInfo.RedirectStandardError = $true
+            $process = New-Object System.Diagnostics.Process
+            $process.StartInfo = $startInfo
+
+            $outPath = [string]$uiState.ExternalIpOutPath
+            $errPath = [string]$uiState.ExternalIpErrPath
+            $process.add_OutputDataReceived({
+                param($sender, $eventArgs)
+                if ($eventArgs.Data) {
+                    Add-Content -LiteralPath $outPath -Value $eventArgs.Data -Encoding UTF8
+                }
+            })
+            $process.add_ErrorDataReceived({
+                param($sender, $eventArgs)
+                if ($eventArgs.Data) {
+                    Add-Content -LiteralPath $errPath -Value $eventArgs.Data -Encoding UTF8
+                }
+            })
+
+            [void]$process.Start()
+            $process.BeginOutputReadLine()
+            $process.BeginErrorReadLine()
+
+            $uiState.ExternalIpProcess = $process
+            $externalIpTimer.Start()
+        }
+        catch {
+            $externalIpValue.Text = 'Not connected'
+            $externalIpValue.ForeColor = $colors.Orange
+        }
+    }
+
+    function Complete-V2ExternalIpLookupIfReady {
+        if (-not $uiState.ExternalIpProcess) {
+            $externalIpTimer.Stop()
+            return
+        }
+
+        if (-not $uiState.ExternalIpProcess.HasExited) {
+            return
+        }
+
+        $externalIpTimer.Stop()
+        try {
+            $uiState.ExternalIpProcess.WaitForExit(100) | Out-Null
+            $uiState.ExternalIpProcess.Dispose()
+        }
+        catch {
+        }
+
+        $uiState.ExternalIpProcess = $null
+        $value = $null
+        if ($uiState.ExternalIpOutPath -and (Test-Path -LiteralPath ([string]$uiState.ExternalIpOutPath) -PathType Leaf)) {
+            try {
+                $value = (Get-Content -LiteralPath ([string]$uiState.ExternalIpOutPath) -ErrorAction Stop | Select-Object -First 1)
+            }
+            catch {
+            }
+        }
+
+        if ([string]::IsNullOrWhiteSpace([string]$value)) {
+            $value = 'Not connected'
+        }
+
+        $externalIpValue.Text = (Format-V2CompactText -Value $value -MaxLength 27)
+        $externalIpValue.ForeColor = if ($value -eq 'Not connected') { $colors.Orange } else { $colors.Text }
+
+        foreach ($path in @($uiState.ExternalIpOutPath, $uiState.ExternalIpErrPath)) {
+            if ($path -and (Test-Path -LiteralPath ([string]$path) -PathType Leaf)) {
+                Remove-Item -LiteralPath ([string]$path) -Force -ErrorAction SilentlyContinue
+            }
         }
     }
 
@@ -2621,7 +2897,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $sidebarUpdateButton.Add_Click({ Show-V2ToolUpdateDialog -Owner $form; [void](Check-V2ToolUpdateInline) })
     $settingsButton.Add_Click({ Show-V2Page -Name 'Schedule' })
-    $helpButton.Add_Click({ Start-Process -FilePath 'https://help.pcninja.pro' | Out-Null })
+    $helpButton.Add_Click({ Start-Process -FilePath 'https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/blob/main/docs/v2/USER-GUIDE.md' | Out-Null })
     $checkAvailableButton.Add_Click({ Invoke-V2UpdatePreview })
     $installSelectedButton.Add_Click({ Start-V2RunUpdates })
     $viewUpdateListButton.Add_Click({ Show-V2UpdateList })
@@ -2669,9 +2945,11 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $filterBox.Add_TextChanged({ Refresh-V2Logs })
     $content.Add_Resize({ Set-V2ResponsiveLayout })
     $tabHost.Add_SizeChanged({ Set-V2ResponsiveLayout })
+    $header.Add_SizeChanged({ Set-V2HeaderLayout })
     $form.Add_SizeChanged({
         if ($form.WindowState -ne 'Minimized') {
             Set-V2ResponsiveLayout
+            $form.BeginInvoke([System.Action]{ Set-V2ResponsiveLayout }) | Out-Null
         }
     })
     $form.Add_ResizeEnd({ Set-V2ResponsiveLayout })
@@ -2682,6 +2960,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $scanTimer.Stop()
         $toolUpdateTimer.Stop()
         $operationTimer.Stop()
+        $externalIpTimer.Stop()
         if ($uiState.ScanProcess) {
             $uiState.ScanProcess.Dispose()
             $uiState.ScanProcess = $null
@@ -2694,11 +2973,25 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $uiState.OperationProcess.Dispose()
             $uiState.OperationProcess = $null
         }
+        if ($uiState.ExternalIpProcess) {
+            try {
+                if (-not $uiState.ExternalIpProcess.HasExited) {
+                    $uiState.ExternalIpProcess.Kill()
+                }
+
+                $uiState.ExternalIpProcess.Dispose()
+            }
+            catch {
+            }
+
+            $uiState.ExternalIpProcess = $null
+        }
     })
 
     $form.Add_Shown({
         Load-V2ScheduleConfig
         Refresh-V2Status
+        Start-V2ExternalIpLookup
         Set-V2ResponsiveLayout
         $initialPage = 'Dashboard'
         if (-not [string]::IsNullOrWhiteSpace([string]$env:PCNINJA_V2_UI_SMOKE_PAGE) -and $pages.ContainsKey([string]$env:PCNINJA_V2_UI_SMOKE_PAGE)) {
@@ -2706,6 +2999,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         }
 
         Show-V2Page -Name $initialPage
+        $form.BeginInvoke([System.Action]{ Set-V2ResponsiveLayout }) | Out-Null
         if ([string]$env:PCNINJA_V2_UI_SMOKE -eq '1') {
             $footerLabel.Text = 'V2 UI smoke test ready.'
             $smokeTimer.Start()

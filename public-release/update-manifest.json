@@ -1,18 +1,18 @@
 {
     "channel":  "stable",
-    "publicLabel":  "V2.0.0-RC22",
-    "version":  "2.0.22.0",
-    "minimumSupportedVersion":  "2.0.22.0",
-    "releaseNotesUrl":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.0.0-rc22",
+    "publicLabel":  "V2.0.0-RC23",
+    "version":  "2.0.23.0",
+    "minimumSupportedVersion":  "2.0.23.0",
+    "releaseNotesUrl":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.0.0-rc23",
     "msi":  {
-                "fileName":  "PcNinja-WinUpdateTool-V2.0.0-RC22-Setup-x64.msi",
-                "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.0-rc22/PcNinja-WinUpdateTool-V2.0.0-RC22-Setup-x64.msi",
-                "sha256":  "8EAF44C69355A8363E6556C728C54F1622E797A7C5C9B133343E53E41F457C48"
+                "fileName":  "PcNinja-WinUpdateTool-V2.0.0-RC23-Setup-x64.msi",
+                "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.0-rc23/PcNinja-WinUpdateTool-V2.0.0-RC23-Setup-x64.msi",
+                "sha256":  "8AAC0996FE06903B2C9EE9FDB54DE59B9374F794DAC114D2DC3AB9CC61D6F233"
             },
     "portable":  {
-                     "fileName":  "PcNinja-WinUpdateTool-V2.0.0-RC22-Portable.exe",
-                     "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.0-rc22/PcNinja-WinUpdateTool-V2.0.0-RC22-Portable.exe",
-                     "sha256":  "73ED00CBD1837BFC00998B1DD3DFD2839C17CB665B897B7380C7359DD8A10FA7"
+                     "fileName":  "PcNinja-WinUpdateTool-V2.0.0-RC23-Portable.exe",
+                     "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.0-rc23/PcNinja-WinUpdateTool-V2.0.0-RC23-Portable.exe",
+                     "sha256":  "5815CE349AFF312EA8280DA3BD7CE4043C231936FBA9E563B9BFF648341A4AA2"
                  },
     "signing":  {
                     "required":  false,
