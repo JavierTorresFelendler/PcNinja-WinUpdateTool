@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "MSI=%~dp0..\PcNinja-WinUpdateTool-V2.2.4-RC1-Setup-x64.msi"
+set "MSI=%~dp0..\PcNinja-WinUpdateTool-V2.2.4-Setup-x64.msi"
 msiexec /i "%MSI%" /qn /norestart ^
   PCNINJA_ENABLE_SCHEDULE=1 ^
   PCNINJA_FREQUENCY=Monthly ^

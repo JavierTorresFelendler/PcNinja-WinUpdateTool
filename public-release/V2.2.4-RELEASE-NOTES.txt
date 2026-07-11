@@ -1,6 +1,6 @@
-﻿PcNinja WinUpdate Tool V2.2.4-RC1 Release Notes
+﻿PcNinja WinUpdate Tool V2.2.4 Release Notes
 
-Release candidate for the V2 line.
+Official stable release of the V2 line.
 
 Highlights:
 - Adds a softer PcNinja alert sound for important warning, error, and question dialogs.

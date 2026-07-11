@@ -1,7 +1,7 @@
 ﻿{
-    "productName":  "PcNinja WinUpdate Tool",
-    "publicLabel":  "V2.2.4-RC1",
-    "version":  "2.2.4.1",
-    "releaseChannel":  "rc",
-    "githubRepository":  "JavierTorresFelendler/PcNinja-WinUpdateTool-V2"
+  "productName": "PcNinja WinUpdate Tool",
+  "publicLabel": "V2.2.4",
+  "version": "2.2.4.2",
+  "releaseChannel": "stable",
+  "githubRepository": "JavierTorresFelendler/PcNinja-WinUpdateTool-V2"
 }

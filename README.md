@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.2.4-RC1
+﻿# PcNinja WinUpdate Tool V2.2.4
 
-V2.2.4-RC1 adds the first calmer PcNinja alert-sound pass: routine dialogs are silent, while important warning/error/question dialogs use a softer PcNinja chime instead of the harsh Windows default alert.
+V2.2.4 adds the calmer PcNinja alert-sound pass: routine dialogs are silent, while important warning/error/question dialogs use a softer PcNinja chime instead of the harsh Windows default alert.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -11,7 +11,7 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 
 Use the V1 repository for the stable V1 download line. Use this repository for V2 stable releases and V2 release candidates.
 
-## New In V2.2.4-RC1
+## New In V2.2.4
 
 - Adds `assets/PcNinja-SoftAlert.wav`, blended from Javier's preferred preview tones.
 - Routes V2 dialogs through quiet wrappers so routine informational dialogs are silent.
