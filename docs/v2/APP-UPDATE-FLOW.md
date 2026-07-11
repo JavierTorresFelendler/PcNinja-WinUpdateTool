@@ -1,4 +1,4 @@
-# PcNinja Tool Update Flow
+﻿# PcNinja Tool Update Flow
 
 This document describes the application update flow for PcNinja WinUpdate Tool itself. This is separate from installing Windows updates.
 
@@ -84,18 +84,18 @@ V2.1 may make this fully silent for RMM/enterprise use after the V2.0 user-initi
 ```json
 {
   "channel": "stable",
-  "publicLabel": "V2.0.1",
-  "version": "2.0.1.0",
-  "minimumSupportedVersion": "2.0.0.0",
-  "releaseNotesUrl": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.0.1",
+  "publicLabel": "V2.2.3",
+  "version": "2.2.3.1",
+  "minimumSupportedVersion": "2.2.3.1",
+  "releaseNotesUrl": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.2.3",
   "msi": {
-    "fileName": "PcNinja-WinUpdateTool-V2.0.1-Setup-x64.msi",
-    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.1/PcNinja-WinUpdateTool-V2.0.1-Setup-x64.msi",
+    "fileName": "PcNinja-WinUpdateTool-V2.2.3-Setup-x64.msi",
+    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.3/PcNinja-WinUpdateTool-V2.2.3-Setup-x64.msi",
     "sha256": "<sha256>"
   },
   "portable": {
-    "fileName": "PcNinja-WinUpdateTool-V2.0.1-Portable.exe",
-    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.1/PcNinja-WinUpdateTool-V2.0.1-Portable.exe",
+    "fileName": "PcNinja-WinUpdateTool-V2.2.3-Portable.exe",
+    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.3/PcNinja-WinUpdateTool-V2.2.3-Portable.exe",
     "sha256": "<sha256>"
   },
   "signing": {

@@ -78,13 +78,13 @@ Installed CLI examples:
 "%ProgramFiles%\PcNinja\WinUpdateTool\PcNinja.WinUpdateTool.Cli.exe" -Mode CollectLogs -OutputPath C:\Temp -Json
 ```
 
-Portable CLI examples:
+Portable CLI examples (replace `<Version>` with your installed build, for example `V2.2.3`):
 
 ```cmd
-PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe /?
-PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe -Mode Status -Json
-PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe -Mode AppUpdateCheck -Json
-PcNinja-WinUpdateTool-V2.2.2.1-Portable.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json
+PcNinja-WinUpdateTool-<Version>-Portable.exe /?
+PcNinja-WinUpdateTool-<Version>-Portable.exe -Mode Status -Json
+PcNinja-WinUpdateTool-<Version>-Portable.exe -Mode AppUpdateCheck -Json
+PcNinja-WinUpdateTool-<Version>-Portable.exe -Mode AppUpdateDownload -UpdatePackageType Portable -Json
 ```
 
 ## Support Links
