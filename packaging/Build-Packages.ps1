@@ -603,6 +603,8 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Moves the Logs filter field beside Open Log File.',
     '- Replaces the small white-backed header icon with the dark full Ninja-DMT V2 logo treatment.',
     '- Rewrites restart-state details so users see a clear restart/no-restart message instead of raw registry diagnostics.',
+    '- Fixes the V2 window closing seconds after launch: the WAN IP lookup now uses file-redirected process output instead of thread-based output events that crashed the PowerShell host.',
+    '- Adds a PCNINJA_V2_UI_SMOKE_MS override so UI smoke runs can stay open long enough to cover asynchronous startup work.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',

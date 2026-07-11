@@ -1191,6 +1191,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $smokeTimer = New-Object System.Windows.Forms.Timer
     $smokeTimer.Interval = 1500
+    $smokeIntervalOverride = 0
+    if ([int]::TryParse([string]$env:PCNINJA_V2_UI_SMOKE_MS, [ref]$smokeIntervalOverride) -and $smokeIntervalOverride -ge 500) {
+        # Allow longer smoke runs so async startup work (e.g. WAN IP lookup)
+        # has time to complete before the window closes.
+        $smokeTimer.Interval = $smokeIntervalOverride
+    }
     $smokeTimer.Add_Tick({
         $smokeTimer.Stop()
         $form.Close()
@@ -1912,34 +1918,19 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $uiState.ExternalIpErrPath = Join-Path $env:TEMP ('pcninja-v2-wan-{0}.err' -f ([guid]::NewGuid().ToString('N')))
             $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
             $command = "try { `$ip = Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 4; if (`$ip) { [string]`$ip } else { 'Not connected' } } catch { 'Not connected' }"
-            $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-            $startInfo.FileName = $ps
-            $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"$command`""
-            $startInfo.UseShellExecute = $false
-            $startInfo.CreateNoWindow = $true
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $process = New-Object System.Diagnostics.Process
-            $process.StartInfo = $startInfo
 
-            $outPath = [string]$uiState.ExternalIpOutPath
-            $errPath = [string]$uiState.ExternalIpErrPath
-            $process.add_OutputDataReceived({
-                param($sender, $eventArgs)
-                if ($eventArgs.Data) {
-                    Add-Content -LiteralPath $outPath -Value $eventArgs.Data -Encoding UTF8
-                }
-            })
-            $process.add_ErrorDataReceived({
-                param($sender, $eventArgs)
-                if ($eventArgs.Data) {
-                    Add-Content -LiteralPath $errPath -Value $eventArgs.Data -Encoding UTF8
-                }
-            })
-
-            [void]$process.Start()
-            $process.BeginOutputReadLine()
-            $process.BeginErrorReadLine()
+            # NOTE: Do NOT attach PowerShell scriptblocks to Process events
+            # (add_OutputDataReceived / add_ErrorDataReceived). Those handlers fire
+            # on a .NET threadpool thread that has no PowerShell runspace, which
+            # throws an unhandled exception and terminates the whole UI process
+            # (window opens then immediately closes). Use OS-level file
+            # redirection via Start-Process instead, same as the scan/update jobs.
+            $process = Start-Process -FilePath $ps `
+                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$command`"" `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $uiState.ExternalIpOutPath `
+                -RedirectStandardError $uiState.ExternalIpErrPath `
+                -PassThru
 
             $uiState.ExternalIpProcess = $process
             $externalIpTimer.Start()

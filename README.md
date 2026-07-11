@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.0.0-RC23
+﻿# PcNinja WinUpdate Tool V2.0.0-RC24
 
-RC23 focuses on final public-release UI polish: stable Settings and Logs resizing, header-level schedule actions, richer System Status details, GitHub Help guidance, and the dark full Ninja-DMT V2 logo treatment.
+RC24 is a stability release: it fixes the regression introduced in RC23 that closed the V2 window seconds after launch in both MSI and portable builds, and hardens the UI smoke-test tooling so asynchronous startup crashes are caught before release.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -10,6 +10,11 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
 
 Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
+
+## New In RC24
+
+- Fixes the V2 window closing seconds after launch. The RC23 WAN IP lookup attached PowerShell script blocks to background process output events; the handlers fired on a thread-pool thread without a PowerShell runspace and terminated the host process. The lookup now uses file-redirected process output, matching the proven pattern used by the scan and update jobs.
+- Adds a `PCNINJA_V2_UI_SMOKE_MS` environment override for the UI smoke window (default 1500 ms) so smoke runs can stay open long enough to catch asynchronous startup failures like the RC23 regression.
 
 ## New In RC23
 
