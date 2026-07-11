@@ -4,6 +4,13 @@ RC22 focuses on public-release UI polish: safer minimum window sizing, cleaner S
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
+## Version Repositories
+
+- V2 repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2
+- V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
+
+Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
+
 ## New In RC22
 
 - Sets a larger V2 minimum window size based on VM layout validation.

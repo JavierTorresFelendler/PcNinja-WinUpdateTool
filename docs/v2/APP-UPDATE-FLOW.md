@@ -87,15 +87,15 @@ V2.1 may make this fully silent for RMM/enterprise use after the V2.0 user-initi
   "publicLabel": "V2.0.1",
   "version": "2.0.1.0",
   "minimumSupportedVersion": "2.0.0.0",
-  "releaseNotesUrl": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool/releases/tag/v2.0.1",
+  "releaseNotesUrl": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.0.1",
   "msi": {
     "fileName": "PcNinja-WinUpdateTool-V2.0.1-Setup-x64.msi",
-    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool/releases/download/v2.0.1/PcNinja-WinUpdateTool-V2.0.1-Setup-x64.msi",
+    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.1/PcNinja-WinUpdateTool-V2.0.1-Setup-x64.msi",
     "sha256": "<sha256>"
   },
   "portable": {
     "fileName": "PcNinja-WinUpdateTool-V2.0.1-Portable.exe",
-    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool/releases/download/v2.0.1/PcNinja-WinUpdateTool-V2.0.1-Portable.exe",
+    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.0.1/PcNinja-WinUpdateTool-V2.0.1-Portable.exe",
     "sha256": "<sha256>"
   },
   "signing": {

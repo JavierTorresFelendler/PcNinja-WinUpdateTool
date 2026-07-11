@@ -102,7 +102,7 @@ function Get-PcnToolVersionInfo {
         PublicLabel = 'V2.0.0-RC22'
         Version = '2.0.22.0'
         ReleaseChannel = 'stable'
-        GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
+        GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool-V2'
     }
 
     $versionFile = Join-Path $PSScriptRoot 'version.json'

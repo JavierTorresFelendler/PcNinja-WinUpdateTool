@@ -40,7 +40,7 @@ if (-not $PublicLabel) {
 }
 
 if (-not $Repository) {
-    $Repository = 'JavierTorresFelendler/PcNinja-WinUpdateTool'
+    $Repository = 'JavierTorresFelendler/PcNinja-WinUpdateTool-V2'
 }
 
 if (-not $ReleaseTag) {

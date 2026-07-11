@@ -1,6 +1,6 @@
 # PcNinja WinUpdate Tool V2 Roadmap
 
-Source channel: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool
+Source channel: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2
 
 Current stable baseline: V1.1.2
 
