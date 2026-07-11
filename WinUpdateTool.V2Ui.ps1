@@ -1400,6 +1400,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $passwordBox = New-V2TextBox -X 620 -Y 88 -Width 190 -Text 'JavierTorres'
     $passwordBox.ReadOnly = $true
     $passwordBox.TextAlign = 'Center'
+    # Size the frame to the text itself; the fixed 190px frame looked oversized
+    # when the window is shrunk to its minimum size.
+    $passwordBoxWidth = ([System.Windows.Forms.TextRenderer]::MeasureText($passwordBox.Text, $passwordBox.Font).Width + 16)
+    $passwordBox.Width = $passwordBoxWidth
     $toolsCard.Controls.AddRange([System.Windows.Forms.Control[]]@($pcnDriverLink, $pcnOfficeLink, $pcnActivationLink, $pcnWindowsLink, $passwordLabel, $passwordBox))
     $drivers.Controls.Add($toolsCard)
 
@@ -1795,7 +1799,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $pcnWindowsLink -X 270 -Y 110 -Width 205 -Height 24
             $passwordX = [Math]::Max(20, [Math]::Min(520, $pageW - 220))
             Set-V2ControlBounds -Control $passwordLabel -X $passwordX -Y 58 -Width 190 -Height 24
-            Set-V2ControlBounds -Control $passwordBox -X $passwordX -Y 88 -Width 190 -Height 28
+            Set-V2ControlBounds -Control $passwordBox -X $passwordX -Y 88 -Width $passwordBoxWidth -Height 28
             Set-V2ControlBounds -Control $sourcesCard -X 0 -Y 450 -Width $pageW -Height 150
         }
         else {
@@ -1815,7 +1819,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             Set-V2ControlBounds -Control $pcnWindowsLink -X 290 -Y 110 -Width 205 -Height 24
             $passwordX = [Math]::Min([Math]::Max(620, [int]($pageW * 0.62)), $pageW - 250)
             Set-V2ControlBounds -Control $passwordLabel -X $passwordX -Y 58 -Width 190 -Height 24
-            Set-V2ControlBounds -Control $passwordBox -X $passwordX -Y 88 -Width 190 -Height 28
+            Set-V2ControlBounds -Control $passwordBox -X $passwordX -Y 88 -Width $passwordBoxWidth -Height 28
             Set-V2ControlBounds -Control $sourcesCard -X 0 -Y 348 -Width $pageW -Height 150
         }
 

@@ -110,8 +110,8 @@ Import-Module $modulePath -Force
 function Get-PcnToolVersionInfo {
     $defaultInfo = [pscustomobject]@{
         ProductName = 'PcNinja WinUpdate Tool'
-        PublicLabel = 'V2.2.3-RC1'
-        Version = '2.2.3.0'
+        PublicLabel = 'V2.2.3'
+        Version = '2.2.3.1'
         ReleaseChannel = 'stable'
         GitHubRepository = 'JavierTorresFelendler/PcNinja-WinUpdateTool-V2'
     }

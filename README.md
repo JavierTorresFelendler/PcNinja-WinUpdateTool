@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.2.2.1
+﻿# PcNinja WinUpdate Tool V2.2.3
 
-V2.2.2.1 is the first official stable release of the V2 line. It carries all the release-candidate work: the modern V2 UI, scheduled updates with wake and retry policies, driver audit, GitHub-based tool updates, and the RC24/RC25 stability and layout fixes.
+V2.2.3 restores the separation between MSI and portable app updates: portable installs download the new portable EXE beside the running file again, even when the launch goes through UAC elevation, while MSI installs keep the MSI flow.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -11,9 +11,10 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 
 Use the V1 repository for the stable V1.1.2 download line. Use this repository for V2 release candidates and the upcoming official V2 release.
 
-## New In V2.2.3-RC1
+## New In V2.2.3
 
 - Fixes portable installs being misdetected as MSI installs during app updates. UAC elevation strips the environment variables set by the portable launcher, so both the branded host and the script now forward the portable source path as a command-line argument across elevation. Portable installs once again download the new portable EXE beside the running file; MSI installs keep the MSI flow.
+- Sizes the Drivers `File password` frame to its text instead of a fixed 190px width, so it no longer looks oversized at the minimum window size.
 
 ## New In V2.2.2.1 (Stable)
 

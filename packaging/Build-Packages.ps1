@@ -611,6 +611,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Recomputes the responsive layout whenever a tab is opened so pages no longer show clipped footers or missing scrollbars until a manual resize.',
     '- Reads the tool update manifest from the main branch now that development converges on a single stable branch.',
     '- Preserves portable-mode detection across UAC elevation by forwarding the portable source path as a command-line argument, so portable installs download the new portable EXE beside the running file instead of the MSI.',
+    '- Sizes the Drivers File password frame to its text so it no longer looks oversized at the minimum window size.',
     '- Keeps Windows Update engine behavior based on V1.1.2.',
     '',
     'Notes:',
