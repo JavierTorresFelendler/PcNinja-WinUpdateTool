@@ -58,6 +58,12 @@ Goals:
 - Fully silent self-update installation.
 - Automatic portable self-replacement.
 - Vendor-specific driver installation.
+- Local ISO OS upgrade screen: new page that lets a technician pick a local Windows ISO
+  (browse or auto-detect in Downloads), validate it (checksum, edition/build vs current OS),
+  and launch an in-place upgrade (`setup.exe /auto upgrade`) with logging into the app's log
+  view. Requires admin elevation, free-space and battery/AC checks, and a clear
+  restart-pending flow. UI follows the Nocturne design system introduced in the
+  dashboard redesign POC.
 - Cloud/fleet dashboard.
 - Intune package generation.
 - Full UI rewrite outside WinForms.

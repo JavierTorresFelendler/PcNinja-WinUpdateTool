@@ -4,28 +4,54 @@
 
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
+    # Nocturne design system palette (see design/nocturne/styles.css)
+    # bg #161826 · surface #232532 · text #e9e9ed · accent #9184d9 (blurple)
     $colors = [pscustomobject]@{
-        AppBack = [System.Drawing.Color]::FromArgb(8, 13, 18)
-        HeaderBack = [System.Drawing.Color]::FromArgb(7, 11, 16)
-        SidebarBack = [System.Drawing.Color]::FromArgb(16, 22, 28)
-        CardBack = [System.Drawing.Color]::FromArgb(18, 24, 30)
-        CardAlt = [System.Drawing.Color]::FromArgb(14, 20, 26)
-        Border = [System.Drawing.Color]::FromArgb(33, 43, 53)
-        Text = [System.Drawing.Color]::FromArgb(238, 245, 252)
-        Muted = [System.Drawing.Color]::FromArgb(157, 172, 186)
-        Blue = [System.Drawing.Color]::FromArgb(25, 120, 215)
-        Blue2 = [System.Drawing.Color]::FromArgb(72, 170, 255)
-        Purple = [System.Drawing.Color]::FromArgb(122, 65, 210)
-        Green = [System.Drawing.Color]::FromArgb(102, 198, 88)
+        AppBack = [System.Drawing.Color]::FromArgb(22, 24, 38)        # --color-bg #161826
+        HeaderBack = [System.Drawing.Color]::FromArgb(18, 20, 32)     # bg, one step darker
+        SidebarBack = [System.Drawing.Color]::FromArgb(26, 28, 43)    # bg/surface midpoint
+        CardBack = [System.Drawing.Color]::FromArgb(35, 37, 50)       # --color-surface #232532
+        CardAlt = [System.Drawing.Color]::FromArgb(29, 31, 43)       # surface, recessed
+        Border = [System.Drawing.Color]::FromArgb(63, 66, 77)         # --color-neutral-800 #3f424d
+        Text = [System.Drawing.Color]::FromArgb(233, 233, 237)        # --color-text #e9e9ed
+        Muted = [System.Drawing.Color]::FromArgb(147, 151, 171)       # --color-neutral-500 #9397ab
+        Blue = [System.Drawing.Color]::FromArgb(145, 132, 217)        # --color-accent #9184d9
+        Blue2 = [System.Drawing.Color]::FromArgb(181, 171, 252)       # --color-accent-400 #b5abfc
+        Purple = [System.Drawing.Color]::FromArgb(167, 161, 219)      # --color-accent-2 #a7a1db
+        Green = [System.Drawing.Color]::FromArgb(125, 201, 143)
         Orange = [System.Drawing.Color]::FromArgb(255, 166, 64)
         Red = [System.Drawing.Color]::FromArgb(214, 78, 78)
-        Input = [System.Drawing.Color]::FromArgb(13, 18, 24)
+        Input = [System.Drawing.Color]::FromArgb(26, 28, 40)
+        AccentSoft = [System.Drawing.Color]::FromArgb(43, 42, 63)     # accent @14% over bg (nav active tint)
+        AccentSoftCard = [System.Drawing.Color]::FromArgb(48, 48, 70) # accent @12% over surface (btn hover)
     }
 
-    $fontBase = New-Object System.Drawing.Font('Segoe UI', 10)
-    $fontSmall = New-Object System.Drawing.Font('Segoe UI', 8.5)
-    $fontTitle = New-Object System.Drawing.Font('Segoe UI Semibold', 12, [System.Drawing.FontStyle]::Bold)
-    $fontHero = New-Object System.Drawing.Font('Segoe UI Semibold', 18, [System.Drawing.FontStyle]::Bold)
+    # Nocturne: Inter for headings/body (heading weight capped at 500 -> Medium),
+    # falling back to Segoe UI when Inter is not installed on the machine.
+    $bodyFamily = 'Segoe UI'
+    $mediumFamily = 'Segoe UI Semibold'
+    try {
+        $interFamily = New-Object System.Drawing.FontFamily('Inter')
+        $bodyFamily = 'Inter'
+        $mediumFamily = 'Inter'
+        try {
+            $interMedium = New-Object System.Drawing.FontFamily('Inter Medium')
+            $mediumFamily = 'Inter Medium'
+            $interMedium.Dispose()
+        }
+        catch {
+            $null = $_
+        }
+        $interFamily.Dispose()
+    }
+    catch {
+        $null = $_
+    }
+
+    $fontBase = New-Object System.Drawing.Font($bodyFamily, 10)
+    $fontSmall = New-Object System.Drawing.Font($bodyFamily, 8.5)
+    $fontTitle = New-Object System.Drawing.Font($mediumFamily, 12)
+    $fontHero = New-Object System.Drawing.Font($mediumFamily, 18)
     $fontMono = New-Object System.Drawing.Font('Consolas', 9)
     $invariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
 
@@ -125,7 +151,7 @@
 
             $pen = $null
             try {
-                $color = [System.Drawing.Color]::FromArgb(47, 59, 69)
+                $color = [System.Drawing.Color]::FromArgb(63, 66, 77)
                 if ($sender.Tag -and $sender.Tag.PSObject.Properties['PcnV2BorderColor']) {
                     $tagColor = $sender.Tag.PcnV2BorderColor
                     if ($tagColor -is [System.Drawing.Color] -and -not $tagColor.IsEmpty) {
@@ -216,8 +242,9 @@
         $button.FlatStyle = 'Flat'
         $button.FlatAppearance.BorderColor = $BorderColor
         $button.FlatAppearance.BorderSize = 1
-        $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(28, 45, 62)
-        $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(24, 92, 160)
+        # Nocturne buttons are outlined, never filled: hover/press are soft accent tints.
+        $button.FlatAppearance.MouseOverBackColor = $colors.AccentSoftCard
+        $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(60, 58, 88)
         $button.UseVisualStyleBackColor = $false
         $button.Location = New-V2Point $X $Y
         $button.Size = New-V2Size $Width $Height
@@ -802,8 +829,8 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $dialog.Controls.Add($safety)
 
         $checkButton = New-V2Button -Text 'Check Again' -X 24 -Y 466 -Width 128 -Height 32
-        $downloadButton = New-V2Button -Text $(if ($packageType -eq 'Portable') { 'Download & Run EXE' } else { 'Download Verified' }) -X 164 -Y 466 -Width $(if ($packageType -eq 'Portable') { 176 } else { 164 }) -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(13, 36, 58))
-        $installButton = New-V2Button -Text 'Download & Install MSI' -X 340 -Y 466 -Width 150 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 67)) -BorderColor $colors.Purple
+        $downloadButton = New-V2Button -Text $(if ($packageType -eq 'Portable') { 'Download & Run EXE' } else { 'Download Verified' }) -X 164 -Y 466 -Width $(if ($packageType -eq 'Portable') { 176 } else { 164 }) -Height 32 -BackColor $colors.CardAlt
+        $installButton = New-V2Button -Text 'Download & Install MSI' -X 340 -Y 466 -Width 150 -Height 32 -BackColor $colors.CardAlt -BorderColor $colors.Purple
         $installButton.Visible = ($packageType -eq 'Msi')
         $releaseButton = New-V2Button -Text 'Release Page' -X $(if ($packageType -eq 'Portable') { 352 } else { 502 }) -Y 466 -Width $(if ($packageType -eq 'Portable') { 154 } else { 122 }) -Height 32
         $closeDialogButton = New-V2Button -Text 'Close' -X 636 -Y 466 -Width 100 -Height 32 -BorderColor $colors.Border
@@ -1028,10 +1055,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $settingsButton.Anchor = 'Top,Right'
     $helpButton = New-V2Button -Text 'Help' -X 1050 -Y 8 -Width 70 -Height 28 -BorderColor $colors.Border
     $helpButton.Anchor = 'Top,Right'
-    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 668 -Y 8 -Width 128 -Height 28 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
+    $clearScheduleButton = New-V2Button -Text 'Clear Schedule' -X 668 -Y 8 -Width 128 -Height 28 -BackColor $colors.CardAlt -BorderColor $colors.Red -ForeColor $colors.Red
     $clearScheduleButton.Anchor = 'Top,Right'
     $clearScheduleButton.Visible = $false
-    $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 806 -Y 8 -Width 128 -Height 28 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+    $saveScheduleButton = New-V2Button -Text 'Save Schedule' -X 806 -Y 8 -Width 128 -Height 28 -BackColor $colors.CardAlt -BorderColor $colors.Purple
     $saveScheduleButton.Anchor = 'Top,Right'
     $saveScheduleButton.Visible = $false
     $header.Controls.AddRange([System.Windows.Forms.Control[]]@($clearScheduleButton, $saveScheduleButton, $settingsButton, $helpButton))
@@ -1097,7 +1124,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $sidebar.Controls.Add((New-V2Label -Text 'Status' -X 18 -Y 548 -Width 90 -Height 22))
     $sidebar.Controls.AddRange([System.Windows.Forms.Control[]]@($installedValue, $latestValueSide, $toolStatusValue))
 
-    $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 582 -Width 228 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(32, 23, 45)) -BorderColor $colors.Purple
+    $sidebarUpdateButton = New-V2Button -Text 'Check Tool Update' -X 16 -Y 582 -Width 228 -Height 32 -BackColor $colors.CardAlt -BorderColor $colors.Purple
     $sidebar.Controls.Add($sidebarUpdateButton)
 
     $tabHost = New-Object System.Windows.Forms.Panel
@@ -1163,20 +1190,25 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         foreach ($tabEntry in $tabButtons.GetEnumerator()) {
             $tabEntry.Value.BackColor = $colors.HeaderBack
+            $tabEntry.Value.ForeColor = $colors.Muted
             $tabEntry.Value.FlatAppearance.BorderColor = $colors.Border
         }
 
         if ($tabButtons.ContainsKey($Name)) {
-            $tabButtons[$Name].BackColor = $colors.Blue
-            $tabButtons[$Name].FlatAppearance.BorderColor = $colors.Blue2
+            # Nocturne active nav item: accent-tinted background + accent text.
+            $tabButtons[$Name].BackColor = $colors.AccentSoft
+            $tabButtons[$Name].ForeColor = $colors.Blue2
+            $tabButtons[$Name].FlatAppearance.BorderColor = $colors.Blue
         }
 
         if ($Name -eq 'Schedule') {
-            $settingsButton.BackColor = $colors.Blue
-            $settingsButton.FlatAppearance.BorderColor = $colors.Blue2
+            $settingsButton.BackColor = $colors.AccentSoft
+            $settingsButton.ForeColor = $colors.Blue2
+            $settingsButton.FlatAppearance.BorderColor = $colors.Blue
         }
         else {
             $settingsButton.BackColor = $colors.HeaderBack
+            $settingsButton.ForeColor = $colors.Text
             $settingsButton.FlatAppearance.BorderColor = $colors.Border
         }
 
@@ -1195,7 +1227,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     }
 
     $tabX = 0
-    foreach ($name in @('Dashboard', 'Updates', 'Drivers', 'Logs')) {
+    foreach ($name in @('Dashboard', 'Updates', 'Schedule', 'Drivers', 'Logs')) {
         $button = New-V2Button -Text $name -X $tabX -Y 0 -Width 172 -Height 42 -BorderColor $colors.Border
         $button.Tag = $name
         $button.Add_Click({
@@ -1293,7 +1325,15 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $dashboard = $pages['Dashboard']
     $dashboard.Controls.Add((New-V2Label -Text 'Dashboard' -X 0 -Y 0 -Width 240 -Height 32 -Font $fontHero))
-    $overviewCard = New-V2Card -X 0 -Y 44 -Width 870 -Height 150 -Title 'System Update Overview'
+    $dashboardSubText = New-V2Label -Text 'Windows Update status at a glance.' -X 0 -Y 32 -Width 520 -Height 22 -Font $fontSmall -ForeColor $colors.Muted
+    $dashboard.Controls.Add($dashboardSubText)
+
+    # Header actions (Nocturne handoff): Refresh (secondary) + Check for Updates (primary)
+    $dashboardRefreshButton = New-V2Button -Text 'Refresh' -X 560 -Y 2 -Width 100 -Height 32 -BorderColor $colors.Border
+    $dashboardCheckButton = New-V2Button -Text 'Check for Updates' -X 668 -Y 2 -Width 170 -Height 32 -BackColor $colors.CardAlt -BorderColor $colors.Blue -ForeColor $colors.Blue2
+    $dashboard.Controls.AddRange([System.Windows.Forms.Control[]]@($dashboardRefreshButton, $dashboardCheckButton))
+
+    $overviewCard = New-V2Card -X 0 -Y 64 -Width 870 -Height 150 -Title 'System Update Overview'
     $overviewIcon = New-V2Label -Text ([string][char]0xE73E) -X 22 -Y 48 -Width 70 -Height 58 -Font (New-Object System.Drawing.Font('Segoe MDL2 Assets', 38)) -ForeColor $colors.Green -Align 'MiddleCenter'
     $overviewStatus = New-V2Label -Text 'Your system is ready.' -X 108 -Y 54 -Width 700 -Height 30 -Font $fontTitle
     $overviewSub = New-V2Label -Text 'Use Updates for Windows Update runs, Settings for scheduling, and Logs for live progress.' -X 108 -Y 88 -Width 700 -Height 26 -ForeColor $colors.Muted
@@ -1314,7 +1354,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $repairCard = New-V2Card -X 0 -Y 376 -Width 870 -Height 112 -Title 'Repair Windows Update'
     $repairNote = New-V2Label -Text 'Use this only when Windows Update appears stuck scanning, downloading, or installing.' -X 20 -Y 44 -Width 560 -Height 44 -ForeColor $colors.Muted
-    $dashboardResetButton = New-V2Button -Text 'Reset Windows Update' -X 640 -Y 42 -Width 190 -Height 36 -BackColor ([System.Drawing.Color]::FromArgb(48, 18, 24)) -BorderColor $colors.Red -ForeColor $colors.Red
+    $dashboardResetButton = New-V2Button -Text 'Reset Windows Update' -X 640 -Y 42 -Width 190 -Height 36 -BackColor $colors.CardAlt -BorderColor $colors.Red -ForeColor $colors.Red
     $repairCard.Controls.AddRange([System.Windows.Forms.Control[]]@($repairNote, $dashboardResetButton))
     $dashboard.Controls.Add($repairCard)
 
@@ -1330,8 +1370,8 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $manualCard.Controls.Add((New-V2Label -Text 'Browse-only optional packages' -X 294 -Y 96 -Width 190 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
     $manualCard.Controls.Add((New-V2Label -Text 'Windows Update driver catalog' -X 540 -Y 96 -Width 210 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
     $manualCard.Controls.Add((New-V2Label -Text 'Explicit opt-in only' -X 48 -Y 136 -Width 180 -Height 18 -Font $fontSmall -ForeColor $colors.Muted))
-    $checkAvailableButton = New-V2Button -Text 'Check Available Updates' -X 394 -Y 136 -Width 210 -Height 38 -BackColor ([System.Drawing.Color]::FromArgb(12, 74, 142))
-    $installSelectedButton = New-V2Button -Text 'Install Selected Updates' -X 620 -Y 136 -Width 220 -Height 38 -BackColor $colors.Blue
+    $checkAvailableButton = New-V2Button -Text 'Check Available Updates' -X 394 -Y 136 -Width 210 -Height 38 -BackColor $colors.CardAlt
+    $installSelectedButton = New-V2Button -Text 'Install Selected Updates' -X 620 -Y 136 -Width 220 -Height 38 -BackColor $colors.CardAlt -BorderColor $colors.Blue -ForeColor $colors.Blue2
     $manualCard.Controls.AddRange([System.Windows.Forms.Control[]]@($checkAvailableButton, $installSelectedButton))
     $updates.Controls.Add($manualCard)
 
@@ -1352,7 +1392,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     $restartCard = New-V2Card -X 0 -Y 342 -Width 870 -Height 90 -Title 'Restart State'
     $restartLabel = New-V2Label -Text 'Checking restart state...' -X 20 -Y 48 -Width 570 -Height 24 -ForeColor $colors.Muted
-    $restartNowButton = New-V2Button -Text 'Restart Now' -X 610 -Y 42 -Width 112 -Height 32 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 18)) -BorderColor $colors.Orange -ForeColor $colors.Orange
+    $restartNowButton = New-V2Button -Text 'Restart Now' -X 610 -Y 42 -Width 112 -Height 32 -BackColor $colors.CardAlt -BorderColor $colors.Orange -ForeColor $colors.Orange
     $restartDetailsButton = New-V2Button -Text 'Details' -X 735 -Y 42 -Width 100 -Height 32 -BorderColor $colors.Border
     $restartCard.Controls.AddRange([System.Windows.Forms.Control[]]@($restartLabel, $restartNowButton, $restartDetailsButton))
     $updates.Controls.Add($restartCard)
@@ -1426,7 +1466,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $auditCard.Controls.Add((New-V2Label -Text 'Driver Audit' -X 20 -Y 12 -Width 260 -Height 26 -Font $fontTitle))
     $auditCard.Controls.Add((New-V2Label -Text 'Scan your system and create a driver inventory report.' -X 20 -Y 46 -Width 420 -Height 24 -ForeColor $colors.Muted))
     $driverAuditButton = New-V2Button -Text 'Create Audit' -X 20 -Y 94 -Width 150 -Height 36
-    $openDriverReportButton = New-V2Button -Text 'Open Report' -X 188 -Y 94 -Width 150 -Height 36 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+    $openDriverReportButton = New-V2Button -Text 'Open Report' -X 188 -Y 94 -Width 150 -Height 36 -BackColor $colors.CardAlt -BorderColor $colors.Purple
     $auditStatus = New-V2Label -Text 'Last audit: Not yet' -X 20 -Y 134 -Width 420 -Height 24 -ForeColor $colors.Muted
     $auditDivider = New-Object System.Windows.Forms.Panel
     $auditDivider.BackColor = $colors.Border
@@ -1491,7 +1531,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $logBox = New-Object System.Windows.Forms.RichTextBox
     $logBox.ReadOnly = $true
     $logBox.BorderStyle = 'FixedSingle'
-    $logBox.BackColor = [System.Drawing.Color]::FromArgb(7, 12, 17)
+    $logBox.BackColor = [System.Drawing.Color]::FromArgb(17, 18, 28)
     $logBox.ForeColor = $colors.Text
     $logBox.Font = $fontMono
     $logBox.Location = New-V2Point 20 112
@@ -1711,7 +1751,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $tabW = [Math]::Max(1, $tabW)
         $tabX = 0
         $tabIndex = 0
-        $tabOrder = @('Dashboard', 'Updates', 'Drivers', 'Logs')
+        $tabOrder = @('Dashboard', 'Updates', 'Schedule', 'Drivers', 'Logs')
         foreach ($tabName in $tabOrder) {
             if ($tabButtons.ContainsKey($tabName)) {
                 $tabIndex++
@@ -1726,19 +1766,21 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $page.AutoScroll = $false
         }
 
-        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 42 -Width $pageW -Height 124
+        Set-V2ControlBounds -Control $dashboardCheckButton -X ([Math]::Max(240, $pageW - 178)) -Y 2 -Width 170 -Height 32
+        Set-V2ControlBounds -Control $dashboardRefreshButton -X ([Math]::Max(130, $pageW - 288)) -Y 2 -Width 100 -Height 32
+        Set-V2ControlBounds -Control $overviewCard -X 0 -Y 64 -Width $pageW -Height 124
         Set-V2ControlBounds -Control $overviewStatus -X 108 -Y 52 -Width ([Math]::Max(260, $overviewCard.Width - 132)) -Height 30
         Set-V2ControlBounds -Control $overviewSub -X 108 -Y 86 -Width ([Math]::Max(260, $overviewCard.Width - 132)) -Height 28
         if ($pageW -ge 900) {
             $halfW = [int][Math]::Floor(($pageW - 16) / 2)
-            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 184 -Width $halfW -Height 128
-            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 184 -Width ($pageW - $halfW - 16) -Height 128
-            Set-V2ControlBounds -Control $repairCard -X 0 -Y 328 -Width $pageW -Height 112
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 206 -Width $halfW -Height 128
+            Set-V2ControlBounds -Control $healthCard -X ($halfW + 16) -Y 206 -Width ($pageW - $halfW - 16) -Height 128
+            Set-V2ControlBounds -Control $repairCard -X 0 -Y 350 -Width $pageW -Height 112
         }
         else {
-            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 184 -Width $pageW -Height 112
-            Set-V2ControlBounds -Control $healthCard -X 0 -Y 310 -Width $pageW -Height 126
-            Set-V2ControlBounds -Control $repairCard -X 0 -Y 450 -Width $pageW -Height 118
+            Set-V2ControlBounds -Control $scheduleSummaryCard -X 0 -Y 206 -Width $pageW -Height 112
+            Set-V2ControlBounds -Control $healthCard -X 0 -Y 332 -Width $pageW -Height 126
+            Set-V2ControlBounds -Control $repairCard -X 0 -Y 472 -Width $pageW -Height 118
         }
         Set-V2ControlBounds -Control $scheduleSummaryText -X 20 -Y 48 -Width ([Math]::Max(240, $scheduleSummaryCard.Width - 40)) -Height 60
         Set-V2ControlBounds -Control $healthText -X 70 -Y 52 -Width ([Math]::Max(180, $healthCard.Width - 92)) -Height 32
@@ -2270,7 +2312,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $detailsBox.Text = Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot
         $dialog.Controls.Add($detailsBox)
 
-        $restartChoice = New-V2Button -Text 'Restart Now' -X 190 -Y 204 -Width 120 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(42, 24, 18)) -BorderColor $colors.Orange -ForeColor $colors.Orange
+        $restartChoice = New-V2Button -Text 'Restart Now' -X 190 -Y 204 -Width 120 -Height 34 -BackColor $colors.CardAlt -BorderColor $colors.Orange -ForeColor $colors.Orange
         $ignoreText = if ($ActionName -eq 'Install') { 'Ignore and install' } else { 'Ignore and check' }
         $ignoreChoice = New-V2Button -Text $ignoreText -X 324 -Y 204 -Width 150 -Height 34
         $cancelChoice = New-V2Button -Text 'Cancel' -X 488 -Y 204 -Width 90 -Height 34 -BorderColor $colors.Border
@@ -2337,7 +2379,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $message = "$ActivityMessage`r`n`r`nSnooz temporarily stops Windows Update services, runs PcNinja, then starts them again. Retry leaves Windows Update alone and schedules a retry using your retry policy."
         $dialog.Controls.Add((New-V2Label -Text $message -X 24 -Y 70 -Width 590 -Height 92 -ForeColor $colors.Muted))
 
-        $snoozeChoice = New-V2Button -Text 'Snooz to run' -X 162 -Y 186 -Width 120 -Height 34 -BackColor ([System.Drawing.Color]::FromArgb(52, 28, 88)) -BorderColor $colors.Purple
+        $snoozeChoice = New-V2Button -Text 'Snooz to run' -X 162 -Y 186 -Width 120 -Height 34 -BackColor $colors.CardAlt -BorderColor $colors.Purple
         $retryChoice = New-V2Button -Text 'Retry later' -X 298 -Y 186 -Width 120 -Height 34
         $cancelChoice = New-V2Button -Text 'Cancel' -X 434 -Y 186 -Width 90 -Height 34 -BorderColor $colors.Border
         $snoozeChoice.Add_Click({ $dialog.Tag = 'Snooze'; $dialog.Close() })
@@ -2963,6 +3005,11 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     })
     $restartDetailsButton.Add_Click({ Show-V2MessageBox((Format-V2PendingRebootDetails -PendingState $uiState.PendingReboot), 'Restart State', 'OK', 'Information') | Out-Null })
     $dashboardResetButton.Add_Click({ Start-V2ResetWindowsUpdate })
+    $dashboardRefreshButton.Add_Click({ Refresh-V2Status })
+    $dashboardCheckButton.Add_Click({
+        Show-V2Page -Name 'Updates'
+        $checkAvailableButton.PerformClick()
+    })
     $clearScheduleButton.Add_Click({ Clear-V2Schedule })
     $saveScheduleButton.Add_Click({ Save-V2Schedule })
     $driverAuditButton.Add_Click({ Start-V2DriverAudit })
