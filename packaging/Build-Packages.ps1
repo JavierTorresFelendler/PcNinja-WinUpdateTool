@@ -48,7 +48,6 @@ if (-not $ReleaseTag) {
 }
 
 $distDir = Join-Path $packageRoot 'dist'
-$payloadZip = Join-Path $distDir 'portable-payload.zip'
 $msiPath = Join-Path $distDir ("PcNinja-WinUpdateTool-Setup-{0}-x64.msi" -f $Version)
 $portableExePath = Join-Path $distDir ("PcNinja-WinUpdateTool-Portable-{0}.exe" -f $Version)
 $publicReleaseDir = Join-Path $packageRoot 'public-release'
@@ -61,10 +60,12 @@ $publicZipPath = Join-Path $packageRoot $publicZipFileName
 $examplesDir = Join-Path $distDir 'deployment-examples'
 $hostExePath = Join-Path $packageRoot 'PcNinja.WinUpdateTool.exe'
 $cliExePath = Join-Path $packageRoot 'PcNinja.WinUpdateTool.Cli.exe'
+$msiActionHostExePath = Join-Path $packageRoot 'PcNinja.WinUpdateTool.MsiActionHost.exe'
 $wxsPath = Join-Path $packagingDir 'PcNinja.WinUpdateTool.wxs'
 $launcherSource = Join-Path $packagingDir 'PortableLauncher.cs'
 $hostSource = Join-Path $packagingDir 'WinUpdateToolHost.cs'
 $cliSource = Join-Path $packagingDir 'WinUpdateToolCli.cs'
+$msiActionHostSource = Join-Path $packagingDir 'MsiActionHost.cs'
 $iconPath = Join-Path $packageRoot 'assets\PcNinja.ico'
 $portableIconPath = Join-Path $packageRoot 'assets\PcNinja-Portable.ico'
 
@@ -301,9 +302,23 @@ if ($LASTEXITCODE -ne 0) {
     throw "CLI host compile failed with exit code $LASTEXITCODE."
 }
 
+& $csc `
+    /nologo `
+    /target:winexe `
+    /optimize+ `
+    /platform:x64 `
+    /out:$msiActionHostExePath `
+    /win32icon:$iconPath `
+    $msiActionHostSource
+
+if ($LASTEXITCODE -ne 0) {
+    throw "MSI maintenance host compile failed with exit code $LASTEXITCODE."
+}
+
 Sign-ReleaseFiles -Certificate $signingCertificate -Timestamp $TimestampServer -Paths @(
     $hostExePath,
     $cliExePath,
+    $msiActionHostExePath,
     (Join-Path $packageRoot 'WinUpdateTool.ps1'),
     (Join-Path $packageRoot 'WinUpdateTool.V2Ui.ps1'),
     (Join-Path $packageRoot 'WinUpdateCore.psm1'),
@@ -334,59 +349,34 @@ if ($LASTEXITCODE -ne 0) {
 Repair-MsiScheduleDialogFlow -Path $msiPath
 Sign-ReleaseFile -Path $msiPath -Certificate $signingCertificate -Timestamp $TimestampServer
 
-$stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ('PcNinjaPortablePayload-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
-
-try {
-    foreach ($file in @(
-        'PcNinja.WinUpdateTool.exe',
-        'PcNinja.WinUpdateTool.Cli.exe',
-        'WinUpdateTool.ps1',
-        'WinUpdateTool.V2Ui.ps1',
-        'WinUpdateCore.psm1',
-        'version.json',
-        'Launch-WinUpdateTool.vbs',
-        'Run-Portable.cmd',
-        'README.md'
-    )) {
-        Copy-Item -LiteralPath (Join-Path $packageRoot $file) -Destination (Join-Path $stagingRoot $file) -Force
-    }
-
-    Copy-Item -LiteralPath (Join-Path $packageRoot 'assets') -Destination (Join-Path $stagingRoot 'assets') -Recurse -Force
-
-    if (Test-Path -LiteralPath $payloadZip) {
-        Remove-Item -LiteralPath $payloadZip -Force
-    }
-
-    Compress-Archive -Path (Join-Path $stagingRoot '*') -DestinationPath $payloadZip -Force
-}
-finally {
-    if (Test-Path -LiteralPath $stagingRoot) {
-        Remove-Item -LiteralPath $stagingRoot -Recurse -Force
-    }
-}
-
-& $csc `
-    /nologo `
-    /target:exe `
-    /optimize+ `
-    /platform:x64 `
-    /out:$portableExePath `
-    /win32icon:$portableIconPath `
-    "/resource:$payloadZip,PcNinjaPortablePayload" `
-    /reference:System.IO.Compression.dll `
-    /reference:System.IO.Compression.FileSystem.dll `
-    /reference:System.Windows.Forms.dll `
-    /reference:System.Drawing.dll `
+$portableCompileArguments = @(
+    '/nologo',
+    '/target:winexe',
+    '/optimize+',
+    '/platform:x64',
+    "/out:$portableExePath",
+    "/win32icon:$portableIconPath",
+    "/reference:$powerShellAutomation",
+    '/reference:System.Windows.Forms.dll',
+    '/reference:System.Drawing.dll',
+    ("/resource:{0},PcNinjaPortable.WinUpdateTool.ps1" -f (Join-Path $packageRoot 'WinUpdateTool.ps1')),
+    ("/resource:{0},PcNinjaPortable.WinUpdateTool.V2Ui.ps1" -f (Join-Path $packageRoot 'WinUpdateTool.V2Ui.ps1')),
+    ("/resource:{0},PcNinjaPortable.WinUpdateCore.psm1" -f (Join-Path $packageRoot 'WinUpdateCore.psm1')),
+    ("/resource:{0},PcNinjaPortable.version.json" -f (Join-Path $packageRoot 'version.json')),
+    ("/resource:{0},PcNinjaPortable.Ninja-DMT.png" -f (Join-Path $packageRoot 'assets\Ninja-DMT.png')),
+    ("/resource:{0},PcNinjaPortable.Ninja-DMT-header.png" -f (Join-Path $packageRoot 'assets\Ninja-DMT-header.png')),
+    ("/resource:{0},PcNinjaPortable.PcNinja.ico" -f (Join-Path $packageRoot 'assets\PcNinja.ico')),
+    ("/resource:{0},PcNinjaPortable.PcNinja-SoftAlert.wav" -f (Join-Path $packageRoot 'assets\PcNinja-SoftAlert.wav')),
     $launcherSource
+)
+
+& $csc @portableCompileArguments
 
 if ($LASTEXITCODE -ne 0) {
     throw "Portable launcher compile failed with exit code $LASTEXITCODE."
 }
 
 Sign-ReleaseFile -Path $portableExePath -Certificate $signingCertificate -Timestamp $TimestampServer
-
-Remove-Item -LiteralPath $payloadZip -Force
 
 Write-ExampleFile -Name 'Install-MSI-Silent-Basic.cmd' -Lines @(
     '@echo off',
@@ -554,6 +544,10 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     $(if ($PublicLabel -match '-RC') { 'Release candidate for the V2 line.' } else { 'Official stable release of the V2 line.' }),
     '',
     'Highlights:',
+    '- Rebuilds the Portable EXE as a Windows GUI host that runs the PowerShell payload in-process instead of extracting and executing embedded EXE files.',
+    '- Embeds named scripts and assets directly instead of an opaque portable payload ZIP to reduce unsigned antivirus false-positive risk.',
+    '- Uses CreateNoWindow for background update checks, WAN lookup, update operations, and relaunch monitoring.',
+    '- Replaces MSI CMD custom actions with a hidden managed maintenance host for process shutdown, configuration, and cleanup.',
     '- Replaces the legacy single-frame V2 icon with multi-resolution transparent Windows ICO assets.',
     '- Uses the approved transparent laptop-ninja artwork for the installed host, taskbar/window, MSI branding, shortcuts, uninstall entry, and Portable EXE download.',
     '- Sets the Windows AppUserModelID on the host process and Start Menu shortcut so the branded icon is retained on the Taskbar.',

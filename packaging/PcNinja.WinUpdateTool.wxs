@@ -19,6 +19,7 @@
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="PcNinjaIcon" SourceFile="$(SourceDir)\assets\PcNinja.ico" />
+    <Binary Id="MsiActionHostBinary" SourceFile="$(SourceDir)\PcNinja.WinUpdateTool.MsiActionHost.exe" />
     <Property Id="ARPPRODUCTICON" Value="PcNinjaIcon" />
     <Property Id="ARPURLINFOABOUT" Value="https://www.PcNinja.Pro" />
     <Property Id="ARPHELPLINK" Value="https://help.pcninja.pro" />
@@ -89,9 +90,7 @@
       </Component>
 
       <Component Id="MsiCleanupComponent" Directory="INSTALLFOLDER" Guid="{32077948-9FA0-4B3B-B2C1-F7A6934523E2}">
-        <File Id="MsiCleanupCmd" Source="$(SourceDir)\MsiCleanup-WinUpdateTool.cmd" KeyPath="yes" />
-        <File Id="MsiCleanupPs1" Source="$(SourceDir)\MsiCleanup-WinUpdateTool.ps1" />
-        <File Id="MsiConfigureCmd" Source="$(SourceDir)\MsiConfigure-WinUpdateTool.cmd" />
+        <File Id="MsiCleanupPs1" Source="$(SourceDir)\MsiCleanup-WinUpdateTool.ps1" KeyPath="yes" />
         <File Id="MsiConfigurePs1" Source="$(SourceDir)\MsiConfigure-WinUpdateTool.ps1" />
       </Component>
 
@@ -213,16 +212,16 @@
 
     <CustomAction
       Id="CleanupOnUninstall"
-      FileRef="MsiCleanupCmd"
-      ExeCommand=""
+      BinaryRef="MsiActionHostBinary"
+      ExeCommand='cleanup "[INSTALLFOLDER]"'
       Execute="deferred"
       Impersonate="no"
       Return="ignore" />
 
     <CustomAction
       Id="CloseRunningPcNinjaWinUpdateTool"
-      Directory="INSTALLFOLDER"
-      ExeCommand='[SystemFolder]cmd.exe /c taskkill /IM PcNinja.WinUpdateTool.exe /T /F &amp; taskkill /IM PcNinja.WinUpdateTool.Cli.exe /T /F'
+      BinaryRef="MsiActionHostBinary"
+      ExeCommand="close"
       Execute="deferred"
       Impersonate="no"
       Return="ignore" />
@@ -246,8 +245,8 @@
 
     <CustomAction
       Id="ConfigureAfterInstall"
-      FileRef="MsiConfigureCmd"
-      ExeCommand='-MsiData "[PCN_ES]|[PCN_FR]|[PCN_TM]|[PCN_DOW]|[PCN_MD]|[PCN_ST]|[PCN_SD]|[PCN_MISS]|[PCN_WAKE]|[PCN_FW]|[PCN_RB]|[PCN_AR]|[PCN_RD]|[PCN_RA]|[PCN_BO]|[PCN_CD]"'
+      BinaryRef="MsiActionHostBinary"
+      ExeCommand='configure "[INSTALLFOLDER]" -MsiData "[PCN_ES]|[PCN_FR]|[PCN_TM]|[PCN_DOW]|[PCN_MD]|[PCN_ST]|[PCN_SD]|[PCN_MISS]|[PCN_WAKE]|[PCN_FW]|[PCN_RB]|[PCN_AR]|[PCN_RD]|[PCN_RA]|[PCN_BO]|[PCN_CD]"'
       Execute="deferred"
       Impersonate="no"
       Return="check" />

@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.2.5-RC1
+﻿# PcNinja WinUpdate Tool V2.2.5-RC2
 
-V2.2.5-RC1 introduces PcNinja mascot branding for the installed WinUpdate Tool and a separate branded Portable file icon based on the ninja-at-laptop artwork. The installed app, taskbar/window, Start Menu, shortcuts, and uninstall entry use the MSI mascot icon; the downloadable Portable EXE uses its own side-profile ninja-at-laptop icon.
+V2.2.5-RC2 keeps the approved laptop-ninja branding, replaces the Portable self-extract-and-launch chain with a quieter in-process host, and suppresses non-GUI console windows during launch, update checks, installation maintenance, and cleanup.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -11,12 +11,20 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 
 Use the V1 repository for the stable V1 download line. Use this repository for V2 stable releases and V2 release candidates.
 
-## New In V2.2.5-RC1
+## New In V2.2.5-RC2
 
-- Replaces the legacy single-frame V2 icon with six-frame, transparent Windows ICO assets (16, 32, 48, 64, 128, and 256 px).
-- Keeps the MSI/runtime surfaces on the approved PcNinja mascot icon: installed host, taskbar/window, MSI Add/Remove Programs branding, Start Menu and desktop shortcuts, and in-app header artwork.
-- Gives the downloadable Portable EXE a distinct PcNinja-branded ninja-at-laptop file icon so it does not look like the Smart Office installer.
-- Keeps the existing V2 update engine, packaging behavior, and CLI flows unchanged while the new visual identity is evaluated as a release candidate.
+- Reduces unsigned Portable false-positive risk by removing the embedded ZIP plus dropped-EXE execution pattern.
+- Runs the Portable PowerShell payload in-process and extracts only named scripts, configuration, and visual assets.
+- Compiles the Portable entry point as a Windows GUI application so normal launches do not flash a console window.
+- Uses a hidden MSI maintenance host instead of visible CMD custom actions during upgrades, configuration, and cleanup.
+- Starts background PowerShell checks with `CreateNoWindow` and captured output rather than visible console processes.
+
+## Earlier V2.2.5-RC1 Branding Work
+
+- Replaces the legacy single-frame icon with transparent Windows ICO assets in eight sizes from 16 through 256 px.
+- Uses the approved laptop-ninja icon consistently for the installed host, taskbar/window, MSI branding, Start Menu, shortcuts, uninstall entry, and Portable EXE.
+- Keeps the application UI free of an embedded header logo so future icon changes do not alter the interface layout.
+- Sets a shared Windows AppUserModelID for the host process and Start Menu shortcut so Taskbar branding remains associated correctly.
 
 ## New In V2.2.4
 

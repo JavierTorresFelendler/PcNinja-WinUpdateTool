@@ -1,8 +1,12 @@
-﻿PcNinja WinUpdate Tool V2.2.5-RC1 Release Notes
+﻿PcNinja WinUpdate Tool V2.2.5-RC2 Release Notes
 
 Release candidate for the V2 line.
 
 Highlights:
+- Rebuilds the Portable EXE as a Windows GUI host that runs the PowerShell payload in-process instead of extracting and executing embedded EXE files.
+- Embeds named scripts and assets directly instead of an opaque portable payload ZIP to reduce unsigned antivirus false-positive risk.
+- Uses CreateNoWindow for background update checks, WAN lookup, update operations, and relaunch monitoring.
+- Replaces MSI CMD custom actions with a hidden managed maintenance host for process shutdown, configuration, and cleanup.
 - Replaces the legacy single-frame V2 icon with multi-resolution transparent Windows ICO assets.
 - Uses the approved transparent laptop-ninja artwork for the installed host, taskbar/window, MSI branding, shortcuts, uninstall entry, and Portable EXE download.
 - Sets the Windows AppUserModelID on the host process and Start Menu shortcut so the branded icon is retained on the Taskbar.

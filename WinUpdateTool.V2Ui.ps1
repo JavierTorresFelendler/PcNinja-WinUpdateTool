@@ -633,6 +633,81 @@ public static class PcnWinUpdateTaskbarIdentity
         return $PSCommandPath
     }
 
+    function Start-V2HiddenProcess {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$FilePath,
+
+            [string]$Arguments,
+
+            [string]$WorkingDirectory,
+
+            [string]$OutputPath,
+
+            [string]$ErrorPath
+        )
+
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.Arguments = $Arguments
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $startInfo.WorkingDirectory = $WorkingDirectory
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+            $startInfo.RedirectStandardOutput = $true
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($ErrorPath)) {
+            $startInfo.RedirectStandardError = $true
+        }
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            $process.Dispose()
+            throw "Failed to start hidden process: $FilePath"
+        }
+
+        $outputTask = if ($startInfo.RedirectStandardOutput) { $process.StandardOutput.ReadToEndAsync() } else { $null }
+        $errorTask = if ($startInfo.RedirectStandardError) { $process.StandardError.ReadToEndAsync() } else { $null }
+        $process | Add-Member -NotePropertyName PcnOutputTask -NotePropertyValue $outputTask -Force
+        $process | Add-Member -NotePropertyName PcnErrorTask -NotePropertyValue $errorTask -Force
+        $process | Add-Member -NotePropertyName PcnOutputPath -NotePropertyValue $OutputPath -Force
+        $process | Add-Member -NotePropertyName PcnErrorPath -NotePropertyValue $ErrorPath -Force
+        $process | Add-Member -NotePropertyName PcnCaptureCompleted -NotePropertyValue $false -Force
+        return $process
+    }
+
+    function Complete-V2HiddenProcessCapture {
+        param([System.Diagnostics.Process]$Process)
+
+        if (-not $Process -or $Process.PcnCaptureCompleted) {
+            return
+        }
+
+        try {
+            $Process.WaitForExit()
+
+            if ($Process.PcnOutputTask -and -not [string]::IsNullOrWhiteSpace([string]$Process.PcnOutputPath)) {
+                $outputText = $Process.PcnOutputTask.GetAwaiter().GetResult()
+                [System.IO.File]::WriteAllText([string]$Process.PcnOutputPath, [string]$outputText, (New-Object System.Text.UTF8Encoding($false)))
+            }
+
+            if ($Process.PcnErrorTask -and -not [string]::IsNullOrWhiteSpace([string]$Process.PcnErrorPath)) {
+                $errorText = $Process.PcnErrorTask.GetAwaiter().GetResult()
+                [System.IO.File]::WriteAllText([string]$Process.PcnErrorPath, [string]$errorText, (New-Object System.Text.UTF8Encoding($false)))
+            }
+        }
+        finally {
+            $Process.PcnCaptureCompleted = $true
+        }
+    }
+
     function Start-V2ToolProcess {
         param(
             [Parameter(Mandatory = $true)]
@@ -642,18 +717,7 @@ public static class PcnWinUpdateTaskbarIdentity
         )
 
         $powershell = Get-PcnPowershellPath
-        $startInfo = @{
-            FilePath = $powershell
-            ArgumentList = $Arguments
-            WindowStyle = 'Hidden'
-            PassThru = $true
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
-            $startInfo.WorkingDirectory = $WorkingDirectory
-        }
-
-        $process = Start-Process @startInfo
+        $process = Start-V2HiddenProcess -FilePath $powershell -Arguments $Arguments -WorkingDirectory $WorkingDirectory
         Write-PcnWinUpdateLog -Message "V2 background process started. PID: $($process.Id)." -EventID 1083
         return $process
     }
@@ -727,7 +791,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 '@
             Set-Content -LiteralPath $scriptPath -Value $watcher -Encoding UTF8 -Force
             $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -InstallerProcessId {1} -TargetPath "{2}" -PackageType {3}' -f $scriptPath, $InstallerProcessId, ([string]$TargetPath).Replace('"', '""'), $PackageType
-            Start-Process -FilePath (Get-PcnPowershellPath) -ArgumentList $arguments -WindowStyle Hidden | Out-Null
+            Start-V2HiddenProcess -FilePath (Get-PcnPowershellPath) -Arguments $arguments | Out-Null
             Write-PcnWinUpdateLog -Message "Post-update relaunch watcher started. Package: $PackageType. Installer PID: $InstallerProcessId. Target: $TargetPath" -EventID 1093
         }
         catch {
@@ -1981,12 +2045,11 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             # throws an unhandled exception and terminates the whole UI process
             # (window opens then immediately closes). Use OS-level file
             # redirection via Start-Process instead, same as the scan/update jobs.
-            $process = Start-Process -FilePath $ps `
-                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$command`"" `
-                -WindowStyle Hidden `
-                -RedirectStandardOutput $uiState.ExternalIpOutPath `
-                -RedirectStandardError $uiState.ExternalIpErrPath `
-                -PassThru
+            $process = Start-V2HiddenProcess `
+                -FilePath $ps `
+                -Arguments "-NoProfile -ExecutionPolicy Bypass -Command `"$command`"" `
+                -OutputPath $uiState.ExternalIpOutPath `
+                -ErrorPath $uiState.ExternalIpErrPath
 
             $uiState.ExternalIpProcess = $process
             $externalIpTimer.Start()
@@ -2009,7 +2072,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         $externalIpTimer.Stop()
         try {
-            $uiState.ExternalIpProcess.WaitForExit(100) | Out-Null
+            Complete-V2HiddenProcessCapture -Process $uiState.ExternalIpProcess
             $uiState.ExternalIpProcess.Dispose()
         }
         catch {
@@ -2573,6 +2636,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $scanTimer.Stop()
 
         try {
+            Complete-V2HiddenProcessCapture -Process $uiState.ScanProcess
             $raw = ''
             if ($uiState.ScanOutPath -and (Test-Path -LiteralPath $uiState.ScanOutPath -PathType Leaf)) {
                 $raw = Get-Content -LiteralPath $uiState.ScanOutPath -Raw -ErrorAction Stop
@@ -2723,13 +2787,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $engineScriptPath = Get-V2MainScriptPath
             $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode PreviewUpdates -Json {1}' -f $engineScriptPath, $scopeArguments
 
-            $process = Start-Process -FilePath (Get-PcnPowershellPath) `
-                -ArgumentList $arguments `
+            $process = Start-V2HiddenProcess `
+                -FilePath (Get-PcnPowershellPath) `
+                -Arguments $arguments `
                 -WorkingDirectory (Split-Path -Parent $engineScriptPath) `
-                -WindowStyle Hidden `
-                -RedirectStandardOutput $uiState.ScanOutPath `
-                -RedirectStandardError $uiState.ScanErrPath `
-                -PassThru
+                -OutputPath $uiState.ScanOutPath `
+                -ErrorPath $uiState.ScanErrPath
 
             $uiState.ScanProcess = $process
             Write-PcnWinUpdateLog -Message "V2 available update check started. PID: $($process.Id). Scope: $scopeArguments." -EventID 1085
@@ -2791,13 +2854,12 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             $packageType = Get-V2AppUpdatePackageType
             $arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Mode AppUpdateCheck -Json -UpdatePackageType {1}' -f $engineScriptPath, $packageType
 
-            $process = Start-Process -FilePath (Get-PcnPowershellPath) `
-                -ArgumentList $arguments `
+            $process = Start-V2HiddenProcess `
+                -FilePath (Get-PcnPowershellPath) `
+                -Arguments $arguments `
                 -WorkingDirectory (Split-Path -Parent $engineScriptPath) `
-                -WindowStyle Hidden `
-                -RedirectStandardOutput $uiState.ToolUpdateOutPath `
-                -RedirectStandardError $uiState.ToolUpdateErrPath `
-                -PassThru
+                -OutputPath $uiState.ToolUpdateOutPath `
+                -ErrorPath $uiState.ToolUpdateErrPath
 
             $uiState.ToolUpdateCheckProcess = $process
             Write-PcnWinUpdateLog -Message "V2 automatic app update check started. PID: $($process.Id). Package: $packageType." -EventID 1095
@@ -2823,6 +2885,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         $toolUpdateTimer.Stop()
         try {
+            Complete-V2HiddenProcessCapture -Process $uiState.ToolUpdateCheckProcess
             $raw = ''
             if ($uiState.ToolUpdateOutPath -and (Test-Path -LiteralPath $uiState.ToolUpdateOutPath -PathType Leaf)) {
                 $raw = Get-Content -LiteralPath $uiState.ToolUpdateOutPath -Raw -ErrorAction Stop

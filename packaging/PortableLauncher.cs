@@ -1,9 +1,13 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.IO.Compression;
+using System.Management.Automation;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 using System.Windows.Forms;
 
@@ -11,62 +15,102 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("PcNinja")]
 [assembly: AssemblyProduct("PcNinja WinUpdate Tool")]
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
-[assembly: AssemblyVersion("2.2.5.1")]
-[assembly: AssemblyFileVersion("2.2.5.1")]
-[assembly: AssemblyInformationalVersion("V2.2.5-RC1")]
+[assembly: AssemblyVersion("2.2.5.2")]
+[assembly: AssemblyFileVersion("2.2.5.2")]
+[assembly: AssemblyInformationalVersion("V2.2.5-RC2")]
 
 internal static class PortableLauncher
 {
-    private const string Version = "2.2.5.1";
-    private const string PayloadResourceName = "PcNinjaPortablePayload";
+    private const string Version = "2.2.5.2";
+    private const string PublicLabel = "V2.2.5-RC2";
+    private const string AppUserModelId = "PcNinja.WinUpdateTool";
+    private const uint AttachParentProcess = 0xFFFFFFFF;
+
+    private sealed class PortableResource
+    {
+        internal PortableResource(string resourceName, string relativePath)
+        {
+            ResourceName = resourceName;
+            RelativePath = relativePath;
+        }
+
+        internal string ResourceName { get; private set; }
+        internal string RelativePath { get; private set; }
+    }
+
+    private static readonly PortableResource[] Resources = new[]
+    {
+        new PortableResource("PcNinjaPortable.WinUpdateTool.ps1", "WinUpdateTool.ps1"),
+        new PortableResource("PcNinjaPortable.WinUpdateTool.V2Ui.ps1", "WinUpdateTool.V2Ui.ps1"),
+        new PortableResource("PcNinjaPortable.WinUpdateCore.psm1", "WinUpdateCore.psm1"),
+        new PortableResource("PcNinjaPortable.version.json", "version.json"),
+        new PortableResource("PcNinjaPortable.Ninja-DMT.png", Path.Combine("assets", "Ninja-DMT.png")),
+        new PortableResource("PcNinjaPortable.Ninja-DMT-header.png", Path.Combine("assets", "Ninja-DMT-header.png")),
+        new PortableResource("PcNinjaPortable.PcNinja.ico", Path.Combine("assets", "PcNinja.ico")),
+        new PortableResource("PcNinjaPortable.PcNinja-SoftAlert.wav", Path.Combine("assets", "PcNinja-SoftAlert.wav"))
+    };
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AttachConsole(uint processId);
 
     [STAThread]
     private static int Main(string[] args)
     {
+        bool uiRequest = IsUiRequest(args);
+        bool hasConsole = TryAttachParentConsole();
+
         try
         {
+            TrySetAppUserModelId();
+
             if (IsHelpRequest(args))
             {
-                if (ShouldWriteHelpToConsole())
+                if (hasConsole)
                 {
-                    WriteHelp();
+                    Console.Write(GetHelpText());
                 }
                 else
                 {
-                    HideConsoleWindow();
                     ShowHelpWindow();
                 }
 
                 return 0;
             }
 
-            HideConsoleForDoubleClickGui(args);
-
-            string extractRoot = GetExtractRoot();
-            Directory.CreateDirectory(extractRoot);
-            ExtractPayload(extractRoot);
-
-            if (args.Length == 0)
+            if (uiRequest && !IsAdministrator())
             {
-                LaunchGui(extractRoot);
-                return 0;
+                return RelaunchElevated(args);
             }
 
-            return LaunchCli(extractRoot, args);
+            string extractRoot = GetExtractRoot();
+            ExtractRuntimeFiles(extractRoot);
+            ConfigurePortableEnvironment();
+            Directory.SetCurrentDirectory(extractRoot);
+
+            string scriptPath = Path.Combine(extractRoot, "WinUpdateTool.ps1");
+            if (!File.Exists(scriptPath))
+            {
+                throw new FileNotFoundException("The portable runtime script was not extracted.", scriptPath);
+            }
+
+            return RunPowerShellScript(scriptPath, args, uiRequest);
         }
         catch (Exception ex)
         {
-            if (args.Length == 0)
+            if (uiRequest || !hasConsole)
             {
                 MessageBox.Show(
-                    "PcNinja WinUpdate Tool portable launcher failed:\r\n\r\n" + ex.Message,
+                    "PcNinja WinUpdate Tool portable failed to start:\r\n\r\n" + ex.Message,
                     "PcNinja WinUpdate Tool",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
             else
             {
-                Console.Error.WriteLine("PcNinja WinUpdate Tool portable launcher failed: " + ex.Message);
+                Console.Error.WriteLine("PcNinja WinUpdate Tool portable failed: " + ex.Message);
             }
 
             return 1;
@@ -79,87 +123,167 @@ internal static class PortableLauncher
         return Path.Combine(localAppData, "PcNinja", "WinUpdateTool", "Portable", Version);
     }
 
-    private static void ExtractPayload(string extractRoot)
+    private static void ExtractRuntimeFiles(string extractRoot)
     {
+        Directory.CreateDirectory(extractRoot);
+        string normalizedRoot = Path.GetFullPath(extractRoot + Path.DirectorySeparatorChar);
         Assembly assembly = Assembly.GetExecutingAssembly();
 
-        using (Stream payloadStream = assembly.GetManifestResourceStream(PayloadResourceName))
+        foreach (PortableResource item in Resources)
         {
-            if (payloadStream == null)
+            string targetPath = Path.GetFullPath(Path.Combine(extractRoot, item.RelativePath));
+            if (!targetPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("Embedded portable payload was not found.");
+                throw new InvalidOperationException("A portable resource resolved outside the runtime directory.");
             }
 
-            using (ZipArchive archive = new ZipArchive(payloadStream, ZipArchiveMode.Read))
+            string targetDirectory = Path.GetDirectoryName(targetPath);
+            if (!String.IsNullOrWhiteSpace(targetDirectory))
             {
-                foreach (ZipArchiveEntry entry in archive.Entries)
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            using (Stream resourceStream = assembly.GetManifestResourceStream(item.ResourceName))
+            {
+                if (resourceStream == null)
                 {
-                    string targetPath = Path.GetFullPath(Path.Combine(extractRoot, entry.FullName));
-                    string normalizedRoot = Path.GetFullPath(extractRoot + Path.DirectorySeparatorChar);
+                    throw new InvalidOperationException("Embedded portable resource is missing: " + item.ResourceName);
+                }
 
-                    if (!targetPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new InvalidOperationException("Portable payload contains an invalid path.");
-                    }
+                string temporaryPath = targetPath + ".new";
+                using (FileStream output = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    resourceStream.CopyTo(output);
+                }
 
-                    if (String.IsNullOrEmpty(entry.Name))
-                    {
-                        Directory.CreateDirectory(targetPath);
-                        continue;
-                    }
+                if (File.Exists(targetPath))
+                {
+                    File.Delete(targetPath);
+                }
 
-                    string targetDir = Path.GetDirectoryName(targetPath);
-                    if (!String.IsNullOrEmpty(targetDir))
-                    {
-                        Directory.CreateDirectory(targetDir);
-                    }
+                File.Move(temporaryPath, targetPath);
+            }
+        }
+    }
 
-                    using (Stream source = entry.Open())
-                    using (FileStream destination = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None))
+    private static void ConfigurePortableEnvironment()
+    {
+        string executablePath = Application.ExecutablePath;
+        Environment.SetEnvironmentVariable("PCNINJA_PORTABLE_MODE", "1", EnvironmentVariableTarget.Process);
+        Environment.SetEnvironmentVariable("PCNINJA_PORTABLE_SOURCE_EXE", executablePath, EnvironmentVariableTarget.Process);
+        Environment.SetEnvironmentVariable("PSExecutionPolicyPreference", "Bypass", EnvironmentVariableTarget.Process);
+
+        string sourceDirectory = Path.GetDirectoryName(executablePath);
+        if (!String.IsNullOrWhiteSpace(sourceDirectory))
+        {
+            Environment.SetEnvironmentVariable("PCNINJA_PORTABLE_SOURCE_DIR", sourceDirectory, EnvironmentVariableTarget.Process);
+        }
+    }
+
+    private static int RunPowerShellScript(string scriptPath, string[] args, bool uiRequest)
+    {
+        Dictionary<string, object> parameters = ParsePowerShellParameters(args);
+
+        if (uiRequest && !parameters.ContainsKey("Mode"))
+        {
+            parameters.Add("Mode", "UI");
+        }
+
+        parameters["PortableSourceExe"] = Application.ExecutablePath;
+
+        using (PowerShell powerShell = PowerShell.Create())
+        {
+            powerShell.AddCommand(scriptPath);
+
+            foreach (KeyValuePair<string, object> parameter in parameters)
+            {
+                powerShell.AddParameter(parameter.Key, parameter.Value);
+            }
+
+            Collection<PSObject> output = powerShell.Invoke();
+
+            if (!uiRequest)
+            {
+                foreach (PSObject item in output)
+                {
+                    if (item != null)
                     {
-                        source.CopyTo(destination);
+                        Console.WriteLine(item.ToString());
                     }
                 }
+
+                foreach (ErrorRecord error in powerShell.Streams.Error)
+                {
+                    Console.Error.WriteLine(error.ToString());
+                }
+            }
+
+            if (powerShell.Streams.Error.Count > 0)
+            {
+                if (uiRequest)
+                {
+                    throw new RuntimeException(powerShell.Streams.Error[0].ToString());
+                }
+
+                return 1;
             }
         }
+
+        return 0;
     }
 
-    private static void LaunchGui(string extractRoot)
+    private static Dictionary<string, object> ParsePowerShellParameters(string[] args)
     {
-        string hostExe = Path.Combine(extractRoot, "PcNinja.WinUpdateTool.exe");
-        if (!File.Exists(hostExe))
+        Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        for (int index = 0; index < args.Length; index++)
         {
-            throw new FileNotFoundException("PcNinja.WinUpdateTool.exe was not found after extraction.", hostExe);
+            string arg = args[index];
+            if (String.IsNullOrWhiteSpace(arg) || (!arg.StartsWith("-", StringComparison.Ordinal) && !arg.StartsWith("/", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            string name = arg.TrimStart('-', '/');
+            if (String.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            object value = true;
+            if ((index + 1) < args.Length)
+            {
+                string next = args[index + 1];
+                if (!String.IsNullOrEmpty(next) && !next.StartsWith("-", StringComparison.Ordinal) && !next.StartsWith("/", StringComparison.Ordinal))
+                {
+                    value = next;
+                    index++;
+                }
+            }
+
+            parameters[name] = value;
         }
 
-        ProcessStartInfo startInfo = new ProcessStartInfo();
-        startInfo.FileName = hostExe;
-        startInfo.WorkingDirectory = extractRoot;
-        startInfo.UseShellExecute = false;
-        AddPortableEnvironment(startInfo);
-        Process.Start(startInfo);
+        return parameters;
     }
 
-    private static int LaunchCli(string extractRoot, string[] args)
+    private static bool IsUiRequest(string[] args)
     {
-        string cliExe = Path.Combine(extractRoot, "PcNinja.WinUpdateTool.Cli.exe");
-        if (!File.Exists(cliExe))
+        if (args == null || args.Length == 0)
         {
-            throw new FileNotFoundException("PcNinja.WinUpdateTool.Cli.exe was not found after extraction.", cliExe);
+            return true;
         }
 
-        ProcessStartInfo startInfo = new ProcessStartInfo();
-        startInfo.FileName = cliExe;
-        startInfo.Arguments = JoinArguments(args);
-        startInfo.WorkingDirectory = extractRoot;
-        startInfo.UseShellExecute = false;
-        AddPortableEnvironment(startInfo);
-
-        using (Process process = Process.Start(startInfo))
+        for (int index = 0; index < args.Length - 1; index++)
         {
-            process.WaitForExit();
-            return process.ExitCode;
+            if (String.Equals(args[index], "-Mode", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(args[index], "/Mode", StringComparison.OrdinalIgnoreCase))
+            {
+                return String.Equals(args[index + 1], "UI", StringComparison.OrdinalIgnoreCase);
+            }
         }
+
+        return false;
     }
 
     private static bool IsHelpRequest(string[] args)
@@ -179,20 +303,70 @@ internal static class PortableLauncher
         return false;
     }
 
-    private static void AddPortableEnvironment(ProcessStartInfo startInfo)
+    private static bool IsAdministrator()
     {
-        startInfo.EnvironmentVariables["PCNINJA_PORTABLE_MODE"] = "1";
-        startInfo.EnvironmentVariables["PCNINJA_PORTABLE_SOURCE_EXE"] = Application.ExecutablePath;
-        string sourceDirectory = Path.GetDirectoryName(Application.ExecutablePath);
-        if (!String.IsNullOrWhiteSpace(sourceDirectory))
+        using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
         {
-            startInfo.EnvironmentVariables["PCNINJA_PORTABLE_SOURCE_DIR"] = sourceDirectory;
+            WindowsPrincipal principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
     }
 
-    private static void WriteHelp()
+    private static int RelaunchElevated(string[] args)
     {
-        Console.Write(GetHelpText());
+        List<string> elevatedArgs = new List<string>(args ?? new string[0]);
+        if (elevatedArgs.Count == 0)
+        {
+            elevatedArgs.Add("-Mode");
+            elevatedArgs.Add("UI");
+        }
+
+        ProcessStartInfo startInfo = new ProcessStartInfo();
+        startInfo.FileName = Application.ExecutablePath;
+        startInfo.Arguments = JoinArguments(elevatedArgs.ToArray());
+        startInfo.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+        startInfo.UseShellExecute = true;
+        startInfo.Verb = "runas";
+        startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+
+        try
+        {
+            Process.Start(startInfo);
+            return 0;
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            if (ex.NativeErrorCode == 1223)
+            {
+                return 1223;
+            }
+
+            throw;
+        }
+    }
+
+    private static bool TryAttachParentConsole()
+    {
+        try
+        {
+            if (!AttachConsole(AttachParentProcess))
+            {
+                return false;
+            }
+
+            StreamWriter output = new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding);
+            output.AutoFlush = true;
+            Console.SetOut(output);
+
+            StreamWriter error = new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
+            error.AutoFlush = true;
+            Console.SetError(error);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void ShowHelpWindow()
@@ -208,8 +382,9 @@ internal static class PortableLauncher
             form.StartPosition = FormStartPosition.CenterScreen;
             form.Size = new Size(780, 560);
             form.MinimumSize = new Size(640, 420);
+            form.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
-            note.Text = "Use from Run, CMD, PowerShell, or deployment tools. The text box is selectable/copyable.";
+            note.Text = "Use from Run, CMD, PowerShell, or deployment tools. The text box is selectable and copyable.";
             note.AutoSize = false;
             note.Location = new Point(18, 18);
             note.Size = new Size(724, 26);
@@ -234,7 +409,6 @@ internal static class PortableLauncher
             form.Controls.Add(helpText);
             form.Controls.Add(okButton);
             form.AcceptButton = okButton;
-
             form.ShowDialog();
         }
     }
@@ -244,11 +418,11 @@ internal static class PortableLauncher
         string executableName = Path.GetFileName(Application.ExecutablePath);
         if (String.IsNullOrWhiteSpace(executableName))
         {
-            executableName = "PcNinja-WinUpdateTool-V2.2.5-RC1-Portable.exe";
+            executableName = "PcNinja-WinUpdateTool-V2.2.5-RC2-Portable.exe";
         }
 
         StringBuilder builder = new StringBuilder();
-        builder.AppendFormat("PcNinja WinUpdate Tool Portable {0}\r\n\r\n", Version);
+        builder.AppendFormat("PcNinja WinUpdate Tool Portable {0} ({1})\r\n\r\n", Version, PublicLabel);
         builder.AppendLine("Portable usage:");
         builder.AppendFormat("  {0}\r\n", executableName);
         builder.AppendFormat("  {0} /?\r\n", executableName);
@@ -259,17 +433,9 @@ internal static class PortableLauncher
         builder.AppendFormat("  {0} -Mode RunUpdates -Silent -RunType Manual -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode ResetWindowsUpdate -ConfirmReset -Json\r\n", executableName);
         builder.AppendFormat("  {0} -Mode AppUpdateCheck -Json\r\n", executableName);
-        builder.AppendFormat("  {0} -Mode AppUpdateDownload -Json\r\n", executableName);
-        builder.AppendFormat("  {0} -Mode AppUpdateDownload -UpdatePackageType Portable -Json\r\n", executableName);
-        builder.AppendFormat("  {0} -Mode Configure -ConfigFile C:\\Temp\\pcninja-install.json -Json\r\n", executableName);
         builder.AppendLine();
-        builder.AppendLine("Portable extraction path:");
+        builder.AppendLine("Portable runtime path:");
         builder.AppendFormat("  %LOCALAPPDATA%\\PcNinja\\WinUpdateTool\\Portable\\{0}\r\n", Version);
-        builder.AppendLine();
-        builder.AppendLine("Installed CLI:");
-        builder.AppendLine("  %ProgramFiles%\\PcNinja\\WinUpdateTool\\PcNinja.WinUpdateTool.Cli.exe /?");
-        builder.AppendLine("  %ProgramFiles%\\PcNinja\\WinUpdateTool\\PcNinja.WinUpdateTool.Cli.exe -Mode Status -Json");
-        builder.AppendLine("  %ProgramFiles%\\PcNinja\\WinUpdateTool\\PcNinja.WinUpdateTool.Cli.exe -Mode ResetWindowsUpdate -ConfirmReset -Json");
         return builder.ToString();
     }
 
@@ -280,14 +446,13 @@ internal static class PortableLauncher
             return String.Empty;
         }
 
-        string[] quoted = new string[args.Length];
-
-        for (int index = 0; index < args.Length; index++)
+        List<string> quoted = new List<string>();
+        foreach (string arg in args)
         {
-            quoted[index] = QuoteArgument(args[index]);
+            quoted.Add(QuoteArgument(arg));
         }
 
-        return String.Join(" ", quoted);
+        return String.Join(" ", quoted.ToArray());
     }
 
     private static string QuoteArgument(string arg)
@@ -304,7 +469,6 @@ internal static class PortableLauncher
 
         StringBuilder builder = new StringBuilder();
         builder.Append('"');
-
         int backslashCount = 0;
 
         foreach (char character in arg)
@@ -333,65 +497,14 @@ internal static class PortableLauncher
         return builder.ToString();
     }
 
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern IntPtr GetConsoleWindow();
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern uint GetConsoleProcessList(uint[] processList, uint processCount);
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    private static void HideConsoleForDoubleClickGui(string[] args)
+    private static void TrySetAppUserModelId()
     {
-        if (args.Length > 0)
+        try
         {
-            return;
+            SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
         }
-
-        IntPtr consoleWindow = GetConsoleWindow();
-        if (consoleWindow == IntPtr.Zero)
+        catch
         {
-            return;
-        }
-
-        uint[] processList = new uint[8];
-        uint processCount = GetConsoleProcessList(processList, (uint)processList.Length);
-
-        if (processCount <= 1)
-        {
-            ShowWindow(consoleWindow, 0);
-        }
-    }
-
-    private static bool HasParentConsole()
-    {
-        IntPtr consoleWindow = GetConsoleWindow();
-        if (consoleWindow == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        uint[] processList = new uint[8];
-        uint processCount = GetConsoleProcessList(processList, (uint)processList.Length);
-        return processCount > 1;
-    }
-
-    private static bool ShouldWriteHelpToConsole()
-    {
-        return HasParentConsole() ||
-            Console.IsInputRedirected ||
-            Console.IsOutputRedirected ||
-            Console.IsErrorRedirected;
-    }
-
-    private static void HideConsoleWindow()
-    {
-        IntPtr consoleWindow = GetConsoleWindow();
-        if (consoleWindow != IntPtr.Zero)
-        {
-            ShowWindow(consoleWindow, 0);
         }
     }
 }
-
