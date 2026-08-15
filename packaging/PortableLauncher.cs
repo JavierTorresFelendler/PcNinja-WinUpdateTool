@@ -356,7 +356,7 @@ internal static class PortableLauncher
         startInfo.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
         startInfo.UseShellExecute = true;
         startInfo.Verb = "runas";
-        startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+        startInfo.WindowStyle = ProcessWindowStyle.Normal;
 
         try
         {

@@ -1368,7 +1368,7 @@ function Unregister-PcnWinUpdateToolTasks {
     $tasks = @()
 
     try {
-        $tasks = @(Get-ScheduledTask -TaskPath $script:PcnTaskPath -ErrorAction Stop | Where-Object {
+        $tasks = @(Get-ScheduledTask -ErrorAction Stop | Where-Object {
             $knownNames -contains $_.TaskName -or $_.TaskName -like "$($script:PcnTaskName)*"
         })
     }
@@ -1379,17 +1379,18 @@ function Unregister-PcnWinUpdateToolTasks {
     $removed = New-Object System.Collections.Generic.List[object]
     $warnings = New-Object System.Collections.Generic.List[string]
 
-    foreach ($task in @($tasks | Sort-Object TaskName -Unique)) {
+    foreach ($task in @($tasks | Sort-Object TaskPath, TaskName -Unique)) {
+        $taskPath = if ([string]::IsNullOrWhiteSpace([string]$task.TaskPath)) { '\' } else { [string]$task.TaskPath }
         try {
-            Unregister-ScheduledTask -TaskName ([string]$task.TaskName) -TaskPath $script:PcnTaskPath -Confirm:$false -ErrorAction Stop
+            Unregister-ScheduledTask -TaskName ([string]$task.TaskName) -TaskPath $taskPath -Confirm:$false -ErrorAction Stop
             $removed.Add([pscustomobject]@{
                 TaskName = [string]$task.TaskName
-                TaskPath = $script:PcnTaskPath
+                TaskPath = $taskPath
             }) | Out-Null
-            Write-PcnWinUpdateLog -Message "Scheduled task removed: $($task.TaskName)." -EventID 1043
+            Write-PcnWinUpdateLog -Message "Scheduled task removed: $taskPath$($task.TaskName)." -EventID 1043
         }
         catch {
-            $message = "Scheduled task was not removed: $($task.TaskName). $($_.Exception.Message)"
+            $message = "Scheduled task was not removed: $taskPath$($task.TaskName). $($_.Exception.Message)"
             $warnings.Add($message) | Out-Null
             Write-PcnWinUpdateLog -Message $message -EntryType Warning -EventID 1044
         }
@@ -1953,6 +1954,11 @@ function Register-PcnWinUpdateScheduledTask {
     }
 
     $taskXml = New-PcnScheduledTaskXml -Config $Config -ScriptPath $ScriptPath
+
+    $cleanupResult = Unregister-PcnWinUpdateToolTasks
+    if (@($cleanupResult.Warnings).Count -gt 0) {
+        throw "Existing PcNinja WinUpdate Tool scheduled tasks could not be replaced: $($cleanupResult.Warnings -join ' ')"
+    }
 
     Register-ScheduledTask `
         -TaskName $script:PcnTaskName `

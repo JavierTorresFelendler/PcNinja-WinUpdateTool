@@ -21,12 +21,13 @@ $pcnWinUpdateTaskNames = @(
 )
 
 try {
-    $tasks = @(Get-ScheduledTask -TaskPath '\PcNinja\' -ErrorAction SilentlyContinue | Where-Object {
+    $tasks = @(Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object {
         $pcnWinUpdateTaskNames -contains $_.TaskName -or $_.TaskName -like 'PcNinja WinUpdate Tool*'
     })
 
     foreach ($task in $tasks) {
-        Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath '\PcNinja\' -Confirm:$false -ErrorAction SilentlyContinue
+        $taskPath = if ([string]::IsNullOrWhiteSpace([string]$task.TaskPath)) { '\' } else { [string]$task.TaskPath }
+        Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath $taskPath -Confirm:$false -ErrorAction SilentlyContinue
     }
 
     foreach ($taskName in $pcnWinUpdateTaskNames) {

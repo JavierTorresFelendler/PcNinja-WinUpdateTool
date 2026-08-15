@@ -14,6 +14,7 @@
       Manufacturer="PcNinja" />
 
     <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
       DowngradeErrorMessage="A newer version of PcNinja WinUpdate Tool is already installed." />
 
     <MediaTemplate EmbedCab="yes" />
