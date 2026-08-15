@@ -2,6 +2,29 @@
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
+    # Keep direct PowerShell launches associated with the installed app on the
+    # taskbar as well as launches through the branded host executable.
+    $taskbarIdentityType = 'PcnWinUpdateTaskbarIdentity' -as [type]
+    if (-not $taskbarIdentityType) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class PcnWinUpdateTaskbarIdentity
+{
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+}
+'@ -ErrorAction SilentlyContinue
+    }
+
+    try {
+        [PcnWinUpdateTaskbarIdentity]::SetCurrentProcessExplicitAppUserModelID('PcNinja.WinUpdateTool') | Out-Null
+    }
+    catch {
+        $null = $_
+    }
+
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
     $colors = [pscustomobject]@{
@@ -971,6 +994,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     $form.BackColor = $colors.AppBack
     $form.ForeColor = $colors.Text
     $form.Font = $fontBase
+    $form.ShowInTaskbar = $true
     $form.Size = New-V2Size 1180 760
     $form.MinimumSize = New-V2Size 1120 760
     Enable-V2DoubleBuffering -Control $form

@@ -556,6 +556,7 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     'Highlights:',
     '- Replaces the legacy single-frame V2 icon with multi-resolution transparent Windows ICO assets.',
     '- Uses the approved transparent laptop-ninja artwork for the installed host, taskbar/window, MSI branding, shortcuts, uninstall entry, and Portable EXE download.',
+    '- Sets the Windows AppUserModelID on the host process and Start Menu shortcut so the branded icon is retained on the Taskbar.',
     '- Removes the in-app header logo so the V2 title bar no longer shows a dark logo inside the dark UI frame.',
     '- Adds a softer PcNinja alert sound for important warning, error, and question dialogs.',
     '- Keeps routine informational dialogs silent and suppresses the harsh default Windows MessageBox sound.',

@@ -129,7 +129,9 @@
         Description="Run PcNinja WinUpdate Tool"
         Target="[INSTALLFOLDER]PcNinja.WinUpdateTool.exe"
         WorkingDirectory="INSTALLFOLDER"
-        Icon="PcNinjaIcon" />
+        Icon="PcNinjaIcon">
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="PcNinja.WinUpdateTool" />
+      </Shortcut>
       <RemoveFolder Id="RemoveProgramMenuPcNinjaFolder" On="uninstall" />
       <RegistryValue
         Root="HKCU"
