@@ -1,6 +1,6 @@
 ﻿# PcNinja WinUpdate Tool V2.2.5-RC1
 
-V2.2.5-RC1 introduces the shared transparent PcNinja mascot branding used by Smart Office Installer. The installed app, portable EXE, taskbar/window, shortcuts, and uninstall entry now use the same multi-resolution Windows icon.
+V2.2.5-RC1 introduces PcNinja mascot branding for the installed WinUpdate Tool and a separate branded Portable file icon based on the ninja-at-laptop artwork. The installed app, taskbar/window, Start Menu, shortcuts, and uninstall entry use the MSI mascot icon; the downloadable Portable EXE uses its own side-profile ninja-at-laptop icon.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -13,8 +13,9 @@ Use the V1 repository for the stable V1 download line. Use this repository for V
 
 ## New In V2.2.5-RC1
 
-- Replaces the legacy single-frame V2 icon with the Smart Office PcNinja mascot in a six-frame, transparent Windows ICO (16, 32, 48, 64, 128, and 256 px).
-- Applies the mascot consistently to the installed host, portable launcher, taskbar/window, MSI Add/Remove Programs branding, Start Menu and desktop shortcuts, and the in-app header artwork.
+- Replaces the legacy single-frame V2 icon with six-frame, transparent Windows ICO assets (16, 32, 48, 64, 128, and 256 px).
+- Keeps the MSI/runtime surfaces on the approved PcNinja mascot icon: installed host, taskbar/window, MSI Add/Remove Programs branding, Start Menu and desktop shortcuts, and in-app header artwork.
+- Gives the downloadable Portable EXE a distinct PcNinja-branded ninja-at-laptop file icon so it does not look like the Smart Office installer.
 - Keeps the existing V2 update engine, packaging behavior, and CLI flows unchanged while the new visual identity is evaluated as a release candidate.
 
 ## New In V2.2.4

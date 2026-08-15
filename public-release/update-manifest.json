@@ -1,4 +1,4 @@
-{
+﻿{
     "channel":  "rc",
     "publicLabel":  "V2.2.5-RC1",
     "version":  "2.2.5.1",
@@ -12,7 +12,7 @@
     "portable":  {
                      "fileName":  "PcNinja-WinUpdateTool-V2.2.5-RC1-Portable.exe",
                      "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.5-rc1/PcNinja-WinUpdateTool-V2.2.5-RC1-Portable.exe",
-                     "sha256":  "C943D6BF83A8C65FC2860A8444724B121EC786101C6B82C4C386EF018B82AB89"
+                     "sha256":  "F6A32C5633B643F3DDC1F0330F78EED4A47D43C70A44827394E5B76B22D72396"
                  },
     "signing":  {
                     "required":  false,

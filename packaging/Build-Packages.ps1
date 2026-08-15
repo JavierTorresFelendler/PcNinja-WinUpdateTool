@@ -66,6 +66,7 @@ $launcherSource = Join-Path $packagingDir 'PortableLauncher.cs'
 $hostSource = Join-Path $packagingDir 'WinUpdateToolHost.cs'
 $cliSource = Join-Path $packagingDir 'WinUpdateToolCli.cs'
 $iconPath = Join-Path $packageRoot 'assets\PcNinja.ico'
+$portableIconPath = Join-Path $packageRoot 'assets\PcNinja-Portable.ico'
 
 if (-not (Test-Path -LiteralPath $distDir)) {
     New-Item -ItemType Directory -Path $distDir -Force | Out-Null
@@ -371,7 +372,7 @@ finally {
     /optimize+ `
     /platform:x64 `
     /out:$portableExePath `
-    /win32icon:$iconPath `
+    /win32icon:$portableIconPath `
     "/resource:$payloadZip,PcNinjaPortablePayload" `
     /reference:System.IO.Compression.dll `
     /reference:System.IO.Compression.FileSystem.dll `
@@ -553,8 +554,9 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     $(if ($PublicLabel -match '-RC') { 'Release candidate for the V2 line.' } else { 'Official stable release of the V2 line.' }),
     '',
     'Highlights:',
-    '- Replaces the legacy single-frame V2 icon with the transparent Smart Office PcNinja mascot in a six-frame Windows ICO.',
-    '- Applies the mascot to the installed host, portable launcher, taskbar/window, MSI branding, shortcuts, uninstall entry, and in-app header.',
+    '- Replaces the legacy single-frame V2 icon with six-frame transparent Windows ICO assets.',
+    '- Keeps the installed host, taskbar/window, MSI branding, shortcuts, uninstall entry, and in-app header on the approved PcNinja mascot icon.',
+    '- Gives the downloadable Portable EXE a separate PcNinja-branded ninja-at-laptop file icon.',
     '- Adds a softer PcNinja alert sound for important warning, error, and question dialogs.',
     '- Keeps routine informational dialogs silent and suppresses the harsh default Windows MessageBox sound.',
     '- Adds shared version manifest foundation.',
@@ -599,7 +601,8 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Changes the Help button to open the GitHub V2 user guide.',
     '- Adds logged-on user, LAN/WAN IP, GPU, motherboard, and BIOS summary data to the V2 System Status sidebar.',
     '- Uses conditional log scrollbars so the log window does not show forced sliders when content does not require them.',
-    '- Keeps the transparent PcNinja mascot consistent across header, icon, MSI, and portable assets.',
+    '- Keeps the transparent PcNinja mascot consistent across header, runtime icon, MSI, shortcuts, and uninstall assets.',
+    '- Uses a separate PcNinja-branded ninja-at-laptop icon for the downloadable Portable EXE file.',
     '- Fixes the Windows & Office Activation link label so the ampersand displays correctly.',
     '- Moves the Logs filter field beside Open Log File.',
     '- Uses the same transparent mascot artwork for the compact in-app header treatment.',
