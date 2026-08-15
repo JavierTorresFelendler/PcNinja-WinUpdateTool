@@ -213,7 +213,7 @@
     <CustomAction
       Id="CleanupOnUninstall"
       BinaryRef="MsiActionHostBinary"
-      ExeCommand='cleanup "[INSTALLFOLDER]"'
+      ExeCommand='cleanup "[INSTALLFOLDER]MsiCleanup-WinUpdateTool.ps1"'
       Execute="deferred"
       Impersonate="no"
       Return="ignore" />
@@ -246,7 +246,7 @@
     <CustomAction
       Id="ConfigureAfterInstall"
       BinaryRef="MsiActionHostBinary"
-      ExeCommand='configure "[INSTALLFOLDER]" -MsiData "[PCN_ES]|[PCN_FR]|[PCN_TM]|[PCN_DOW]|[PCN_MD]|[PCN_ST]|[PCN_SD]|[PCN_MISS]|[PCN_WAKE]|[PCN_FW]|[PCN_RB]|[PCN_AR]|[PCN_RD]|[PCN_RA]|[PCN_BO]|[PCN_CD]"'
+      ExeCommand='configure "[INSTALLFOLDER]MsiConfigure-WinUpdateTool.ps1" -MsiData "[PCN_ES]|[PCN_FR]|[PCN_TM]|[PCN_DOW]|[PCN_MD]|[PCN_ST]|[PCN_SD]|[PCN_MISS]|[PCN_WAKE]|[PCN_FW]|[PCN_RB]|[PCN_AR]|[PCN_RD]|[PCN_RA]|[PCN_BO]|[PCN_CD]"'
       Execute="deferred"
       Impersonate="no"
       Return="check" />

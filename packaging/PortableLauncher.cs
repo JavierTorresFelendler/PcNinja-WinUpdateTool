@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
@@ -64,6 +65,7 @@ internal static class PortableLauncher
 
         try
         {
+            WriteBootstrapLog("Launcher started. UI=" + uiRequest + "; Elevated=" + IsAdministrator());
             TrySetAppUserModelId();
 
             if (IsHelpRequest(args))
@@ -82,11 +84,13 @@ internal static class PortableLauncher
 
             if (uiRequest && !IsAdministrator())
             {
+                WriteBootstrapLog("Requesting elevation for the portable UI.");
                 return RelaunchElevated(args);
             }
 
             string extractRoot = GetExtractRoot();
             ExtractRuntimeFiles(extractRoot);
+            WriteBootstrapLog("Portable runtime extracted to " + extractRoot);
             ConfigurePortableEnvironment();
             Directory.SetCurrentDirectory(extractRoot);
 
@@ -96,10 +100,13 @@ internal static class PortableLauncher
                 throw new FileNotFoundException("The portable runtime script was not extracted.", scriptPath);
             }
 
-            return RunPowerShellScript(scriptPath, args, uiRequest);
+            int exitCode = RunPowerShellScript(scriptPath, args, uiRequest);
+            WriteBootstrapLog("PowerShell runtime completed with exit code " + exitCode);
+            return exitCode;
         }
         catch (Exception ex)
         {
+            WriteBootstrapLog("Launcher failure: " + ex);
             if (uiRequest || !hasConsole)
             {
                 MessageBox.Show(
@@ -191,8 +198,16 @@ internal static class PortableLauncher
 
         parameters["PortableSourceExe"] = Application.ExecutablePath;
 
+        InitialSessionState sessionState = InitialSessionState.CreateDefault();
+        using (Runspace runspace = RunspaceFactory.CreateRunspace(sessionState))
         using (PowerShell powerShell = PowerShell.Create())
         {
+            runspace.ApartmentState = System.Threading.ApartmentState.STA;
+            runspace.ThreadOptions = PSThreadOptions.UseCurrentThread;
+            runspace.Open();
+            powerShell.Runspace = runspace;
+            WriteBootstrapLog("STA PowerShell runspace opened.");
+
             powerShell.AddCommand(scriptPath);
 
             foreach (KeyValuePair<string, object> parameter in parameters)
@@ -230,6 +245,20 @@ internal static class PortableLauncher
         }
 
         return 0;
+    }
+
+    private static void WriteBootstrapLog(string message)
+    {
+        try
+        {
+            string logRoot = Path.Combine(GetExtractRoot(), "Logs");
+            Directory.CreateDirectory(logRoot);
+            string logPath = Path.Combine(logRoot, "PortableLauncher.log");
+            File.AppendAllText(logPath, DateTime.Now.ToString("s") + " " + message + Environment.NewLine);
+        }
+        catch
+        {
+        }
     }
 
     private static Dictionary<string, object> ParsePowerShellParameters(string[] args)

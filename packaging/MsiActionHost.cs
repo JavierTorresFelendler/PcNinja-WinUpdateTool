@@ -34,18 +34,19 @@ internal static class MsiActionHost
 
             if (String.Equals(action, "configure", StringComparison.OrdinalIgnoreCase))
             {
-                return RunHiddenPowerShell("MsiConfigure-WinUpdateTool.ps1", GetApplicationDirectory(args), Slice(args, 2));
+                return RunHiddenPowerShell(GetScriptPath(args), Slice(args, 2));
             }
 
             if (String.Equals(action, "cleanup", StringComparison.OrdinalIgnoreCase))
             {
-                return RunHiddenPowerShell("MsiCleanup-WinUpdateTool.ps1", GetApplicationDirectory(args), Slice(args, 2));
+                return RunHiddenPowerShell(GetScriptPath(args), Slice(args, 2));
             }
 
             return 2;
         }
-        catch
+        catch (Exception ex)
         {
+            WriteMaintenanceLog("host", String.Empty, ex.ToString(), 1);
             return 1;
         }
     }
@@ -75,22 +76,29 @@ internal static class MsiActionHost
         }
     }
 
-    private static string GetApplicationDirectory(string[] args)
+    private static string GetScriptPath(string[] args)
     {
         if (args == null || args.Length < 2 || String.IsNullOrWhiteSpace(args[1]))
         {
-            return AppDomain.CurrentDomain.BaseDirectory;
+            throw new ArgumentException("The MSI maintenance script path was not supplied.");
         }
 
         return Path.GetFullPath(args[1]);
     }
 
-    private static int RunHiddenPowerShell(string scriptName, string applicationDirectory, string[] args)
+    private static int RunHiddenPowerShell(string scriptPath, string[] args)
     {
-        string scriptPath = Path.Combine(applicationDirectory, scriptName);
+        string scriptName = Path.GetFileName(scriptPath);
         if (!File.Exists(scriptPath))
         {
+            WriteMaintenanceLog(scriptName, String.Empty, "Maintenance script was not found: " + scriptPath, 2);
             return 2;
+        }
+
+        string applicationDirectory = Path.GetDirectoryName(scriptPath);
+        if (String.IsNullOrWhiteSpace(applicationDirectory))
+        {
+            applicationDirectory = AppDomain.CurrentDomain.BaseDirectory;
         }
 
         string powershell = Path.Combine(
