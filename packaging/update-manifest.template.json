@@ -5,12 +5,12 @@
   "minimumSupportedVersion": "2.0.0.0",
   "releaseNotesUrl": "{ReleaseNotesUrl}",
   "msi": {
-    "fileName": "WinUpdate Tool by PcNinja.msi",
+    "fileName": "WinUpdate.Tool.by.PcNinja.msi",
     "url": "{MsiUrl}",
     "sha256": "{MsiSha256}"
   },
   "portable": {
-    "fileName": "WinUpdate Tool by PcNinja.exe",
+    "fileName": "WinUpdate.Tool.by.PcNinja.exe",
     "url": "{PortableUrl}",
     "sha256": "{PortableSha256}"
   },

@@ -51,9 +51,11 @@ $distDir = Join-Path $packageRoot 'dist'
 $msiPath = Join-Path $distDir ("PcNinja-WinUpdateTool-Setup-{0}-x64.msi" -f $Version)
 $portableExePath = Join-Path $distDir ("PcNinja-WinUpdateTool-Portable-{0}.exe" -f $Version)
 $publicReleaseDir = Join-Path $packageRoot 'public-release'
-$publicMsiFileName = 'WinUpdate Tool by PcNinja.msi'
-$publicPortableFileName = 'WinUpdate Tool by PcNinja.exe'
-$publicZipFileName = 'WinUpdate Tool by PcNinja Public Release.zip'
+# GitHub normalizes spaces in release asset names to dots. Use the normalized
+# names at build time so update-manifest URLs address the actual assets.
+$publicMsiFileName = 'WinUpdate.Tool.by.PcNinja.msi'
+$publicPortableFileName = 'WinUpdate.Tool.by.PcNinja.exe'
+$publicZipFileName = 'WinUpdate.Tool.by.PcNinja.Public.Release.zip'
 $publicMsiPath = Join-Path $publicReleaseDir $publicMsiFileName
 $publicPortablePath = Join-Path $publicReleaseDir $publicPortableFileName
 $publicZipPath = Join-Path $packageRoot $publicZipFileName
