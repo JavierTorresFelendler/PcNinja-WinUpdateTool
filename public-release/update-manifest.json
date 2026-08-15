@@ -7,12 +7,12 @@
     "msi":  {
                 "fileName":  "PcNinja-WinUpdateTool-V2.2.5-RC1-Setup-x64.msi",
                 "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.5-rc1/PcNinja-WinUpdateTool-V2.2.5-RC1-Setup-x64.msi",
-                "sha256":  "8DA6A5D1BB1B10713FF8296DC0F1B0A26595C6F46353EBB9E8D309EC478649E5"
+                "sha256":  "529A4DC83A1BA06681EECCC7FB67015E01C5FEBAE478638E55C636CD72B9CB3F"
             },
     "portable":  {
                      "fileName":  "PcNinja-WinUpdateTool-V2.2.5-RC1-Portable.exe",
                      "url":  "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.5-rc1/PcNinja-WinUpdateTool-V2.2.5-RC1-Portable.exe",
-                     "sha256":  "A52FD61CB4BD942F974F89AD7438464E17847570012C1F93B0037EF47604E041"
+                     "sha256":  "DB3D0FFF413D86126558098BF22E2F6BFFDB42E60762354B971543EAEAE68D5C"
                  },
     "signing":  {
                     "required":  false,

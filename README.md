@@ -55,7 +55,7 @@ Use the V1 repository for the stable V1 download line. Use this repository for V
 - Changes the Help button to open the GitHub V2 user guide.
 - Adds logged-on user, LAN/WAN IP, GPU, motherboard, and BIOS summary data to System Status.
 - Uses conditional log scrollbars so the log window does not show forced sliders when content does not require them.
-- Keeps the V2 logo on the dark full Ninja-DMT artwork across header, icon, MSI, and portable assets.
+- Uses the approved transparent laptop-ninja artwork for the application icon, MSI, Portable EXE, shortcuts, and uninstall metadata; the V2 UI remains unchanged and does not render an in-app logo.
 
 ## New In RC22
 
