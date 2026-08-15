@@ -1,6 +1,6 @@
-﻿# PcNinja WinUpdate Tool V2.2.4
+﻿# PcNinja WinUpdate Tool V2.2.5-RC1
 
-V2.2.4 adds the calmer PcNinja alert-sound pass: routine dialogs are silent, while important warning/error/question dialogs use a softer PcNinja chime instead of the harsh Windows default alert.
+V2.2.5-RC1 introduces the shared transparent PcNinja mascot branding used by Smart Office Installer. The installed app, portable EXE, taskbar/window, shortcuts, and uninstall entry now use the same multi-resolution Windows icon.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -10,6 +10,12 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 - V1 legacy repository: https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V1
 
 Use the V1 repository for the stable V1 download line. Use this repository for V2 stable releases and V2 release candidates.
+
+## New In V2.2.5-RC1
+
+- Replaces the legacy single-frame V2 icon with the Smart Office PcNinja mascot in a six-frame, transparent Windows ICO (16, 32, 48, 64, 128, and 256 px).
+- Applies the mascot consistently to the installed host, portable launcher, taskbar/window, MSI Add/Remove Programs branding, Start Menu and desktop shortcuts, and the in-app header artwork.
+- Keeps the existing V2 update engine, packaging behavior, and CLI flows unchanged while the new visual identity is evaluated as a release candidate.
 
 ## New In V2.2.4
 

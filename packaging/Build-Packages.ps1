@@ -180,11 +180,8 @@ function Get-ReleaseSigningCertificate {
         return $match
     }
 
-    $valid = @($certs | Where-Object { $_.NotAfter -gt (Get-Date) })
-    if ($valid.Count -eq 1) {
-        return $valid[0]
-    }
-
+    # Never auto-select an unrelated certificate from the developer machine.
+    # Release signing must be an explicit choice through -CertificateThumbprint or -PfxPath.
     return $null
 }
 
@@ -230,7 +227,7 @@ if ($signingCertificate) {
     Write-Host "Signing enabled with certificate: $($signingCertificate.Subject)"
 }
 else {
-    Write-Host 'Signing skipped: no code-signing certificate was provided or found.'
+    Write-Host 'Signing skipped: no code-signing certificate was explicitly provided.'
 }
 $wixCandidates = @(
     (Join-Path $workspaceRoot '.build-tools-wix6\wix.exe'),
@@ -556,6 +553,8 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     $(if ($PublicLabel -match '-RC') { 'Release candidate for the V2 line.' } else { 'Official stable release of the V2 line.' }),
     '',
     'Highlights:',
+    '- Replaces the legacy single-frame V2 icon with the transparent Smart Office PcNinja mascot in a six-frame Windows ICO.',
+    '- Applies the mascot to the installed host, portable launcher, taskbar/window, MSI branding, shortcuts, uninstall entry, and in-app header.',
     '- Adds a softer PcNinja alert sound for important warning, error, and question dialogs.',
     '- Keeps routine informational dialogs silent and suppresses the harsh default Windows MessageBox sound.',
     '- Adds shared version manifest foundation.',
@@ -600,10 +599,10 @@ Set-Content -LiteralPath (Join-Path $publicReleaseDir "$PublicLabel-RELEASE-NOTE
     '- Changes the Help button to open the GitHub V2 user guide.',
     '- Adds logged-on user, LAN/WAN IP, GPU, motherboard, and BIOS summary data to the V2 System Status sidebar.',
     '- Uses conditional log scrollbars so the log window does not show forced sliders when content does not require them.',
-    '- Keeps the V2 logo on the dark full Ninja-DMT artwork across header, icon, MSI, and portable assets.',
+    '- Keeps the transparent PcNinja mascot consistent across header, icon, MSI, and portable assets.',
     '- Fixes the Windows & Office Activation link label so the ampersand displays correctly.',
     '- Moves the Logs filter field beside Open Log File.',
-    '- Replaces the small white-backed header icon with the dark full Ninja-DMT V2 logo treatment.',
+    '- Uses the same transparent mascot artwork for the compact in-app header treatment.',
     '- Rewrites restart-state details so users see a clear restart/no-restart message instead of raw registry diagnostics.',
     '- Fixes the V2 window closing seconds after launch: the WAN IP lookup now uses file-redirected process output instead of thread-based output events that crashed the PowerShell host.',
     '- Adds a PCNINJA_V2_UI_SMOKE_MS override so UI smoke runs can stay open long enough to cover asynchronous startup work.',
