@@ -976,7 +976,6 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     Enable-V2DoubleBuffering -Control $form
 
     $iconPath = Join-Path $PSScriptRoot 'assets\PcNinja.ico'
-    $headerLogoPath = Join-Path $PSScriptRoot 'assets\Ninja-DMT-header.png'
     if (Test-Path -LiteralPath $iconPath) {
         try {
             $form.Icon = New-Object System.Drawing.Icon($iconPath)
@@ -994,35 +993,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     Enable-V2DoubleBuffering -Control $header
     $form.Controls.Add($header)
 
-    $logo = New-Object System.Windows.Forms.PictureBox
-    $logo.Location = New-V2Point 10 3
-    $logo.Size = New-V2Size 38 38
-    $logo.SizeMode = 'Zoom'
-    $logo.BackColor = $colors.HeaderBack
-    if (Test-Path -LiteralPath $headerLogoPath) {
-        try {
-            $sourceLogo = [System.Drawing.Image]::FromFile($headerLogoPath)
-            try {
-                $logo.Image = New-Object System.Drawing.Bitmap($sourceLogo)
-            }
-            finally {
-                $sourceLogo.Dispose()
-            }
-        }
-        catch {
-            $logo.BackColor = $colors.Blue
-        }
-    }
-    elseif (Test-Path -LiteralPath $iconPath) {
-        try {
-            $logo.Image = ([System.Drawing.Icon]::ExtractAssociatedIcon($iconPath)).ToBitmap()
-        }
-        catch {
-            $logo.BackColor = $colors.Blue
-        }
-    }
-    $header.Controls.Add($logo)
-    $header.Controls.Add((New-V2Label -Text 'PcNinja WinUpdate Tool V2.0' -X 58 -Y 8 -Width 360 -Height 28 -Font $fontTitle))
+    $header.Controls.Add((New-V2Label -Text 'PcNinja WinUpdate Tool V2.0' -X 16 -Y 8 -Width 402 -Height 28 -Font $fontTitle))
 
     $settingsButton = New-V2Button -Text 'Settings' -X 945 -Y 8 -Width 94 -Height 28 -BorderColor $colors.Border
     $settingsButton.Anchor = 'Top,Right'
