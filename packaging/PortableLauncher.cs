@@ -18,12 +18,12 @@ using System.Windows.Forms;
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
 [assembly: AssemblyVersion("2.2.5.2")]
 [assembly: AssemblyFileVersion("2.2.5.2")]
-[assembly: AssemblyInformationalVersion("V2.2.5-RC2")]
+[assembly: AssemblyInformationalVersion("V2.2.5")]
 
 internal static class PortableLauncher
 {
     private const string Version = "2.2.5.2";
-    private const string PublicLabel = "V2.2.5-RC2";
+    private const string PublicLabel = "V2.2.5";
     private const string AppUserModelId = "PcNinja.WinUpdateTool";
     private const uint AttachParentProcess = 0xFFFFFFFF;
 
@@ -447,7 +447,7 @@ internal static class PortableLauncher
         string executableName = Path.GetFileName(Application.ExecutablePath);
         if (String.IsNullOrWhiteSpace(executableName))
         {
-            executableName = "PcNinja-WinUpdateTool-V2.2.5-RC2-Portable.exe";
+            executableName = "WinUpdate Tool by PcNinja.exe";
         }
 
         StringBuilder builder = new StringBuilder();

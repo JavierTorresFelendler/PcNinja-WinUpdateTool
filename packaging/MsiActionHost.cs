@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 [assembly: AssemblyCopyright("Copyright (c) PcNinja")]
 [assembly: AssemblyVersion("2.2.5.2")]
 [assembly: AssemblyFileVersion("2.2.5.2")]
-[assembly: AssemblyInformationalVersion("V2.2.5-RC2")]
+[assembly: AssemblyInformationalVersion("V2.2.5")]
 
 internal static class MsiActionHost
 {

@@ -36,7 +36,7 @@ if (-not $Version) {
 }
 
 if (-not $PublicLabel) {
-    $PublicLabel = 'V2.0.0-RC23'
+    $PublicLabel = 'V2.0.0'
 }
 
 if (-not $Repository) {
@@ -51,9 +51,9 @@ $distDir = Join-Path $packageRoot 'dist'
 $msiPath = Join-Path $distDir ("PcNinja-WinUpdateTool-Setup-{0}-x64.msi" -f $Version)
 $portableExePath = Join-Path $distDir ("PcNinja-WinUpdateTool-Portable-{0}.exe" -f $Version)
 $publicReleaseDir = Join-Path $packageRoot 'public-release'
-$publicMsiFileName = "PcNinja-WinUpdateTool-$PublicLabel-Setup-x64.msi"
-$publicPortableFileName = "PcNinja-WinUpdateTool-$PublicLabel-Portable.exe"
-$publicZipFileName = "PcNinja-WinUpdateTool-$PublicLabel-PublicRelease.zip"
+$publicMsiFileName = 'WinUpdate Tool by PcNinja.msi'
+$publicPortableFileName = 'WinUpdate Tool by PcNinja.exe'
+$publicZipFileName = 'WinUpdate Tool by PcNinja Public Release.zip'
 $publicMsiPath = Join-Path $publicReleaseDir $publicMsiFileName
 $publicPortablePath = Join-Path $publicReleaseDir $publicPortableFileName
 $publicZipPath = Join-Path $packageRoot $publicZipFileName
@@ -511,6 +511,8 @@ Copy-Item -LiteralPath $examplesDir -Destination (Join-Path $publicReleaseDir 'd
 $publicMsiHash = (Get-FileHash -LiteralPath $publicMsiPath -Algorithm SHA256).Hash
 $publicPortableHash = (Get-FileHash -LiteralPath $publicPortablePath -Algorithm SHA256).Hash
 $releaseBaseUrl = "https://github.com/$Repository/releases/download/$ReleaseTag"
+$publicMsiUrl = "$releaseBaseUrl/$([System.Uri]::EscapeDataString($publicMsiFileName))"
+$publicPortableUrl = "$releaseBaseUrl/$([System.Uri]::EscapeDataString($publicPortableFileName))"
 
 $manifest = [ordered]@{
     channel = if ($versionInfo -and $versionInfo.releaseChannel) { [string]$versionInfo.releaseChannel } else { 'stable' }
@@ -520,12 +522,12 @@ $manifest = [ordered]@{
     releaseNotesUrl = "https://github.com/$Repository/releases/tag/$ReleaseTag"
     msi = [ordered]@{
         fileName = $publicMsiFileName
-        url = "$releaseBaseUrl/$publicMsiFileName"
+        url = $publicMsiUrl
         sha256 = $publicMsiHash
     }
     portable = [ordered]@{
         fileName = $publicPortableFileName
-        url = "$releaseBaseUrl/$publicPortableFileName"
+        url = $publicPortableUrl
         sha256 = $publicPortableHash
     }
     signing = [ordered]@{

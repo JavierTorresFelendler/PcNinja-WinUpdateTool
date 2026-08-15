@@ -1,6 +1,6 @@
-﻿PcNinja WinUpdate Tool V2.2.5-RC2 Release Notes
+﻿PcNinja WinUpdate Tool V2.2.5 Release Notes
 
-Release candidate for the V2 line.
+Official stable release of the V2 line.
 
 Highlights:
 - Rebuilds the Portable EXE as a Windows GUI host that runs the PowerShell payload in-process instead of extracting and executing embedded EXE files.

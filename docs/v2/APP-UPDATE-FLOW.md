@@ -84,18 +84,18 @@ V2.1 may make this fully silent for RMM/enterprise use after the V2.0 user-initi
 ```json
 {
   "channel": "stable",
-  "publicLabel": "V2.2.3",
-  "version": "2.2.3.1",
-  "minimumSupportedVersion": "2.2.3.1",
-  "releaseNotesUrl": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.2.3",
+  "publicLabel": "V2.2.5",
+  "version": "2.2.5.2",
+  "minimumSupportedVersion": "2.2.5.2",
+  "releaseNotesUrl": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/tag/v2.2.5",
   "msi": {
-    "fileName": "PcNinja-WinUpdateTool-V2.2.3-Setup-x64.msi",
-    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.3/PcNinja-WinUpdateTool-V2.2.3-Setup-x64.msi",
+    "fileName": "WinUpdate Tool by PcNinja.msi",
+    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.5/WinUpdate%20Tool%20by%20PcNinja.msi",
     "sha256": "<sha256>"
   },
   "portable": {
-    "fileName": "PcNinja-WinUpdateTool-V2.2.3-Portable.exe",
-    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.3/PcNinja-WinUpdateTool-V2.2.3-Portable.exe",
+    "fileName": "WinUpdate Tool by PcNinja.exe",
+    "url": "https://github.com/JavierTorresFelendler/PcNinja-WinUpdateTool-V2/releases/download/v2.2.5/WinUpdate%20Tool%20by%20PcNinja.exe",
     "sha256": "<sha256>"
   },
   "signing": {

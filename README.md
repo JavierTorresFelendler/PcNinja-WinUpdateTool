@@ -1,6 +1,6 @@
 ﻿# PcNinja WinUpdate Tool V2.2.5-RC2
 
-V2.2.5-RC2 keeps the approved laptop-ninja branding, replaces the Portable self-extract-and-launch chain with a quieter in-process host, and suppresses non-GUI console windows during launch, update checks, installation maintenance, and cleanup.
+V2.2.5 keeps the approved laptop-ninja branding, replaces the Portable self-extract-and-launch chain with a quieter in-process host, suppresses non-GUI console windows during launch, update checks, installation maintenance, and cleanup, and standardizes the public download filenames.
 
 The Windows Update engine, driver audit behavior, interactive MSI wizard, portable packaging, and branded host behavior remain based on the V2 recovery work.
 
@@ -11,7 +11,7 @@ The Windows Update engine, driver audit behavior, interactive MSI wizard, portab
 
 Use the V1 repository for the stable V1 download line. Use this repository for V2 stable releases and V2 release candidates.
 
-## New In V2.2.5-RC2
+## New In V2.2.5
 
 - Reduces unsigned Portable false-positive risk by removing the embedded ZIP plus dropped-EXE execution pattern.
 - Runs the Portable PowerShell payload in-process and extracts only named scripts, configuration, and visual assets.
